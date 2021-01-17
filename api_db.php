@@ -46,7 +46,11 @@ if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
     while ($row = $res->fetch_array(MYSQLI_NUM)) {    // TODO: Don't necessarily need fetch_array(_BOTH).
         $time = DateTime::createFromFormat('Y-m-d H:i:s', $row[0], new DateTimeZone("UTC"));
         $timestamp_s = $time->format('U');
-        $returnedData[$timestamp_s] = array_slice($row, 1);
+        $deviceId = $row[1];
+        $value = $row[2];
+        $type = $row[3];
+        // { deviceId => type => timestamp => value }
+        $returnedData[$deviceId][$type][$timestamp_s] = $value;
     }
 
     $data = $returnedData;

@@ -42,9 +42,9 @@
     <div class="row">
       <div class="col-md">
         <!-- Main chart -->
-        <div class="card card-primary" id="weather-graph">
+        <div class="card card-primary" id="temp-graph">
           <div class="card-header">
-            <h3 class="card-title">Weather</h3>
+            <h3 class="card-title">Temperature</h3>
               <div class="card-tools"> <!-- TODO: Probably unneeded -->
                 <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i>
                 </button>
@@ -52,7 +52,7 @@
           </div>
           <div class="card-body">
             <div class="chart">
-              <canvas id="mainChartElement" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+              <canvas id="tempGraphElement" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
             </div>
           </div> <!-- /.card-body -->
           <div class="overlay">
@@ -73,11 +73,11 @@
 <script src="plugins/daterangepicker/daterangepicker.js"></script>
 <!-- page script -->
 <script>
-  var mainChart;
+  var tempGraph;
 
   $(function () {
-    var mainChartCanvas = $('#mainChartElement').get(0).getContext('2d')
-    var mainChartOptions = {
+    var tempGraphCanvas = $('#tempGraphElement').get(0).getContext('2d')
+    var tempGraphOptions = {
       maintainAspectRatio: false,
       responsive: true,
       datasetFill: false,
@@ -93,7 +93,7 @@
                 hour: 'HH'
               },
               ticks: {
-                //sampleSize: 20 Doesn't work???
+                //sampleSize: 20
               }
             }
           }
@@ -116,20 +116,12 @@
       grey: 'rgb(201, 203, 207)'
     };
 
-    mainChart = new Chart(mainChartCanvas, {
+    tempGraph = new Chart(tempGraphCanvas, {
       type: 'line',
       data: {
-        datasets: [
-          {
-            label: 'Temperature',
-            backgroundColor: window.chartColors.red,
-            borderColor: window.chartColors.red,
-            fill: false,
-            data: []
-          }
-        ]
+        datasets: []
       },
-      options: mainChartOptions
+      options: tempGraphOptions
     });
 
     $('#querytime').daterangepicker(
@@ -151,7 +143,7 @@
           'This Year'   : [moment().startOf("year"), moment()],
           'All Time'    : [moment(0), moment()]
         },
-        startDate: moment().subtract(24, 'hours'), // Default
+        startDate: moment().subtract(1, 'hours'), // Default
         endDate: moment(),
         opens: 'center',
         autoUpdateInput: true
@@ -173,35 +165,59 @@
   });
 
   function fetchAndUpdate(startDate, endDate) {
-    $('#weather-graph .overlay').show();
+    $('#temp-graph .overlay').show();
     var startUTC = Math.trunc(startDate.valueOf() / 1000);
     var endUTC = Math.trunc(endDate.valueOf() / 1000);
     $.getJSON("api_db.php?getGraphData&weather&from=" + startUTC + "&to=" + endUTC,
       function (data) {
-        var samples = [];
-        var labels = [];
         var totalNum = 0;
-        $.each(data, function(timestamp_s, record) {
-          ++totalNum;
-          if (record['type'] != 0)
-          {
-            return;
+
+        var indexToDevice = [];
+        var nextIndex = 0;
+
+        tempGraph.data.labels = [];
+
+        $.each(data,
+          function(deviceId, rec0) {
+            if (!indexToDevice.includes(deviceId)) {
+              indexToDevice[nextIndex] = deviceId;
+              nextIndex++;
+            }
+            var deviceIndex = indexToDevice.indexOf(deviceId);
+
+            $.each(rec0,
+              function(type, rec1) {
+                if (type != 0) // Temperature
+                {
+                  return;
+                }
+
+                tempGraph.data.datasets[deviceIndex] =
+                {
+                  label: 'Device ' + deviceId,
+                  backgroundColor: Object.keys(window.chartColors)[deviceIndex],
+                  borderColor: Object.keys(window.chartColors)[deviceIndex],
+                  fill: false,
+                  data: []
+                };
+
+                $.each(rec1,
+                  function(timestamp_s, val) {
+                    ++totalNum;
+                    tempGraph.data.datasets[deviceIndex].data.push(val);
+                    tempGraph.data.labels.push(new Date(Number(timestamp_s * 1000)));
+                  }
+                ); // $.each rec1
+              }
+            ); // $.each rec0
           }
-          if (samples.length > 200) {
-            return;
-          }
-          var dateNum = Number(timestamp_s * 1000);
-          samples.push(record['value']);
-          labels.push(new Date(Number(timestamp_s * 1000)));
-        });
+        ); // $.each data
 
         console.log("Got " + totalNum + " records");
-
-        mainChart.data.datasets[0].data = samples;
-        mainChart.data.labels = labels;
-        mainChart.update();
-        $('#weather-graph .overlay').hide();
-      });
+        tempGraph.update();
+        $('#temp-graph .overlay').hide();
+      } // Json handler
+    );
   }
 </script>
 
