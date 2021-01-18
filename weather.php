@@ -60,7 +60,31 @@
           </div> <!-- /.overlay -->
         </div> <!-- /.card -->
       </div>
-    </div>
+    </div> <!-- row -->
+
+    <div class="row">
+      <div class="col-md">
+        <!-- Main chart -->
+        <div class="card card-primary" id="humidity-graph">
+          <div class="card-header">
+            <h3 class="card-title">Humidity</h3>
+              <div class="card-tools"> <!-- TODO: Probably unneeded -->
+                <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i>
+                </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart">
+              <canvas id="humidityGraph" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+            </div>
+          </div> <!-- /.card-body -->
+          <div class="overlay">
+            <i class="fas fa-2x fa-sync-alt fa-spin"></i>
+          </div> <!-- /.overlay -->
+        </div> <!-- /.card -->
+      </div>
+    </div> <!-- row -->
+
   </div><!-- /.container-fluid -->
 </div>
 <!-- /.content -->
@@ -73,11 +97,15 @@
 <script src="plugins/daterangepicker/daterangepicker.js"></script>
 <!-- page script -->
 <script>
-  var tempGraph;
+  "use strict";
+
+  var graphs = { "temp": { name: "temp", element: "#tempGraphElement", cardId: 'temp-graph' },
+                 "humidity": { name: "humidity", element: "#humidityGraph", cardId: 'humidity-graph' }
+                };
 
   $(function () {
-    var tempGraphCanvas = $('#tempGraphElement').get(0).getContext('2d')
-    var tempGraphOptions = {
+
+    const defaultGraphOptions = {
       maintainAspectRatio: false,
       responsive: true,
       datasetFill: false,
@@ -116,13 +144,18 @@
       grey: 'rgb(201, 203, 207)'
     };
 
-    tempGraph = new Chart(tempGraphCanvas, {
-      type: 'line',
-      data: {
-        datasets: []
-      },
-      options: tempGraphOptions
-    });
+    for (let graphName in graphs) {
+      let graph = graphs[graphName];
+      let canvas = $(graph.element).get(0).getContext('2d');
+
+      graph.chart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          datasets: []
+        },
+        options: defaultGraphOptions
+      });
+    }
 
     $('#querytime').daterangepicker(
       {
@@ -130,7 +163,7 @@
         timePickerIncrement: 15,
         timePicker24Hour: true,
         locale: {
-          format: "DD/MM/YYYY HH:MM"
+          format: "DD/MM/YYYY HH:mm"
         },
         ranges : {
           'Last 5 minutes'  : [moment().subtract(5, 'minutes'), moment()],
@@ -146,36 +179,38 @@
         startDate: moment().subtract(1, 'hours'), // Default
         endDate: moment(),
         opens: 'center',
-        autoUpdateInput: true
-      },
-      /*function (start, end) {
-        //$('#reportrange span').html(start.format('MMMM D, YYYY') + ' - ' + end.format('MMMM D, YYYY'))
-        //TODO: Start query
-      }*/
+        autoUpdateInput: false
+      }
     )
 
     // Initial fetch
-    var picker = $('#querytime').data('daterangepicker');
-    fetchAndUpdate(picker.startDate, picker.endDate);
+    let picker = $('#querytime').data('daterangepicker');
+    fetchAndUpdate(picker.startDate, picker.endDate, picker.locale.format);
   });
 
   $("#querytime").on("apply.daterangepicker", function (ev, picker) {
-    //$(this).val(picker.startDate.format(dateformat) + " to " + picker.endDate.format(dateformat));
-    fetchAndUpdate(picker.startDate, picker.endDate);
+    fetchAndUpdate(picker.startDate, picker.endDate, picker.locale.format);
   });
 
-  function fetchAndUpdate(startDate, endDate) {
-    $('#temp-graph .overlay').show();
-    var startUTC = Math.trunc(startDate.valueOf() / 1000);
-    var endUTC = Math.trunc(endDate.valueOf() / 1000);
+  function fetchAndUpdate(startDate, endDate, dateFormat) {
+    $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + startDate.diff(endDate) + ")");
+    for (let graphName in graphs)
+      $('#' + graphs[graphName].cardId + ' .overlay').show();
+
+    let startUTC = Math.trunc(startDate.valueOf() / 1000);
+    let endUTC = Math.trunc(endDate.valueOf() / 1000);
     $.getJSON("api_db.php?getGraphData&weather&from=" + startUTC + "&to=" + endUTC,
       function (data) {
-        var totalNum = 0;
+        let totalNum = 0;
 
-        var indexToDevice = [];
-        var nextIndex = 0;
+        let indexToDevice = [];
+        let nextIndex = 0;
 
-        tempGraph.data.labels = [];
+        const typeToChart = { 0: graphs['temp'].chart, 1: graphs['humidity'].chart };
+
+        for (let graphName in graphs) {
+          graphs[graphName].chart.data.labels = [];
+        }
 
         $.each(data,
           function(deviceId, rec0) {
@@ -183,16 +218,19 @@
               indexToDevice[nextIndex] = deviceId;
               nextIndex++;
             }
-            var deviceIndex = indexToDevice.indexOf(deviceId);
+            let deviceIndex = indexToDevice.indexOf(deviceId);
 
             $.each(rec0,
               function(type, rec1) {
-                if (type != 0) // Temperature
+
+                if (type > 1)
                 {
                   return;
                 }
 
-                tempGraph.data.datasets[deviceIndex] =
+                let chart = typeToChart[type];
+
+                chart.data.datasets[deviceIndex] =
                 {
                   label: 'Device ' + deviceId,
                   backgroundColor: Object.keys(window.chartColors)[deviceIndex],
@@ -204,8 +242,8 @@
                 $.each(rec1,
                   function(timestamp_s, val) {
                     ++totalNum;
-                    tempGraph.data.datasets[deviceIndex].data.push(val);
-                    tempGraph.data.labels.push(new Date(Number(timestamp_s * 1000)));
+                    chart.data.datasets[deviceIndex].data.push(val);
+                    chart.data.labels.push(new Date(Number(timestamp_s * 1000)));
                   }
                 ); // $.each rec1
               }
@@ -214,8 +252,11 @@
         ); // $.each data
 
         console.log("Got " + totalNum + " records");
-        tempGraph.update();
-        $('#temp-graph .overlay').hide();
+        for (let graphName in graphs) {
+          let graph = graphs[graphName];
+          graph.chart.update();
+          $('#' + graph.cardId + ' .overlay').hide();
+        }
       } // Json handler
     );
   }
