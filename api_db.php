@@ -1,15 +1,32 @@
 <?php
 
-header('Content-type: application/json');
-
 $data = array();
 
 $dbpassFile = fopen('dbpass', 'r') or die('Unable to open file');
 $dbpass = fgets($dbpassFile);
 fclose($dbpassFile);
-$logConnection = new mysqli('aardy', 'logger', $dbpass, 'sensorLogs');
+//$logConnection = new mysqli('frambo', 'logger', $dbpass, 'sensorLogs');
+$logConnection = new mysqli('furion', 'logViewer', $dbpass, 'sensorLogs');
 if ($logConnection->connect_errno) {
     die("Failed to connect to server: (" . $logConnection->connect_errno . ") " . $logConnection->connect_error);
+}
+
+if(isset($_GET['getDeviceDesc'])) {
+    if (!isset($_GET['deviceId'])) {
+        die('deviceId not set');
+    }
+
+    $deviceId = $_GET['deviceId'];
+
+    $sql = "SELECT name, friendlyName, sensorName FROM devices WHERE deviceId = $deviceId";
+    $res = $logConnection->query($sql);
+
+    $returnedData = $res->fetch_assoc();
+
+    $data = $returnedData;
+    header('Content-type: application/json');
+    echo json_encode($data);
+    return;
 }
 
 if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
@@ -43,7 +60,7 @@ if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
     }
 
     $returnedData = array();
-    while ($row = $res->fetch_array(MYSQLI_NUM)) {    // TODO: Don't necessarily need fetch_array(_BOTH).
+    while ($row = $res->fetch_array(MYSQLI_NUM)) {
         $time = DateTime::createFromFormat('Y-m-d H:i:s', $row[0], new DateTimeZone("UTC"));
         $timestamp_s = $time->format('U');
         $deviceId = $row[1];
@@ -54,6 +71,7 @@ if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
     }
 
     $data = $returnedData;
+    header('Content-type: application/json');
+    echo json_encode($data);
+    return;
 }
-
-echo json_encode($data);
