@@ -85,6 +85,29 @@
       </div>
     </div> <!-- row -->
 
+    <div class="row">
+      <div class="col-md">
+        <!-- Main chart -->
+        <div class="card card-primary" id="pressure-graph">
+          <div class="card-header">
+            <h3 class="card-title">Pressure</h3>
+              <div class="card-tools"> <!-- TODO: Probably unneeded -->
+                <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i>
+                </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart">
+              <canvas id="pressureGraph" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+            </div>
+          </div> <!-- /.card-body -->
+          <div class="overlay">
+            <i class="fas fa-2x fa-sync-alt fa-spin"></i>
+          </div> <!-- /.overlay -->
+        </div> <!-- /.card -->
+      </div>
+    </div> <!-- row -->
+
   </div><!-- /.container-fluid -->
 </div>
 <!-- /.content -->
@@ -99,13 +122,14 @@
 <script>
   "use strict";
 
-  var graphs = { "temp": { name: "temp", element: "#tempGraphElement", cardId: 'temp-graph' },
-                 "humidity": { name: "humidity", element: "#humidityGraph", cardId: 'humidity-graph' }
+  var graphs = { "temp": { name: "temp", element: "#tempGraphElement", cardId: 'temp-graph', yBeginAtZero: true },
+                 "humidity": { name: "humidity", element: "#humidityGraph", cardId: 'humidity-graph', yBeginAtZero: true },
+                 "pressure": { name: "pressure", element: "#pressureGraph", cardId: 'pressure-graph', yBeginAtZero: false }
                 };
 
   $(function () {
 
-    let defaultGraphOptions = {
+    const defaultGraphOptions = {
       maintainAspectRatio: false,
       responsive: true,
       datasetFill: false,
@@ -148,6 +172,9 @@
     for (let graphName in graphs) {
       let graph = graphs[graphName];
       let canvas = $(graph.element).get(0).getContext('2d');
+
+      let options = Object.assign({}, defaultGraphOptions);
+      options.scales.yAxes[0].ticks.beginAtZero = graph.yBeginAtZero;
 
       graph.chart = new Chart(canvas, {
         type: 'line',
@@ -208,7 +235,7 @@
         let indexToDevice = [];
         let nextIndex = 0;
 
-        const typeToChart = { 0: graphs['temp'].chart, 1: graphs['humidity'].chart };
+        const typeToChart = { 0: graphs['temp'].chart, 1: graphs['humidity'].chart, 2: graphs['pressure'].chart };
 
         for (let graphName in graphs) {
           graphs[graphName].chart.data.labels = [];
@@ -225,7 +252,7 @@
             $.each(rec0,
               function(type, rec1) {
 
-                if (type > 1)
+                if (type > 2)
                 {
                   return;
                 }
