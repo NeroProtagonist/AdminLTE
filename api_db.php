@@ -18,7 +18,7 @@ if(isset($_GET['getDeviceDesc'])) {
 
     $deviceId = $_GET['deviceId'];
 
-    $sql = "SELECT name, friendlyName, sensorName FROM devices WHERE deviceId = $deviceId";
+    $sql = "SELECT deviceId, name, friendlyName, sensorName FROM devices WHERE deviceId = $deviceId";
     $res = $logConnection->query($sql);
 
     $returnedData = $res->fetch_assoc();

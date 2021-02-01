@@ -105,7 +105,7 @@
 
   $(function () {
 
-    const defaultGraphOptions = {
+    let defaultGraphOptions = {
       maintainAspectRatio: false,
       responsive: true,
       datasetFill: false,
@@ -131,7 +131,8 @@
             beginAtZero: true
           }
         }]
-      }
+      },
+      animation: false
     }
 
     window.chartColors = {
@@ -194,8 +195,9 @@
 
   function fetchAndUpdate(startDate, endDate, dateFormat) {
     $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + startDate.diff(endDate) + ")");
-    for (let graphName in graphs)
+    for (let graphName in graphs) {
       $('#' + graphs[graphName].cardId + ' .overlay').show();
+    }
 
     let startUTC = Math.trunc(startDate.valueOf() / 1000);
     let endUTC = Math.trunc(endDate.valueOf() / 1000);
@@ -252,11 +254,31 @@
         ); // $.each data
 
         console.log("Got " + totalNum + " records");
-        for (let graphName in graphs) {
-          let graph = graphs[graphName];
-          graph.chart.update();
-          $('#' + graph.cardId + ' .overlay').hide();
+
+        let deviceRequests = [];
+
+        // Get device names
+        for (let deviceId of indexToDevice) {
+          deviceRequests.push($.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId));
         }
+
+        $.when.apply($, deviceRequests).done(function() {
+          for (let resultIndex in arguments) {
+            data = arguments[resultIndex][0];
+            let deviceIndex = indexToDevice.indexOf(data['deviceId']);
+            for (let graphName in graphs) {
+              let graph = graphs[graphName];
+              if (graph.chart.data.datasets[deviceIndex] !== undefined) {
+                graph.chart.data.datasets[deviceIndex].label = data['friendlyName'];
+              }
+            }
+          }
+          for (let graphName in graphs) {
+            let graph = graphs[graphName];
+            graph.chart.update();
+            $('#' + graph.cardId + ' .overlay').hide();
+          }
+        });
       } // Json handler
     );
   }
