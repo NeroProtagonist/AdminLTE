@@ -1,7 +1,5 @@
 <?php
 
-$data = array();
-
 $dbpassFile = fopen('dbpass', 'r') or die('Unable to open file');
 $dbpass = fgets($dbpassFile);
 fclose($dbpassFile);
@@ -11,7 +9,47 @@ if ($logConnection->connect_errno) {
     die("Failed to connect to server: (" . $logConnection->connect_errno . ") " . $logConnection->connect_error);
 }
 
-if(isset($_GET['getDeviceDesc'])) {
+if (isset($_GET['getDeviceIds'])) {
+    $sql = "SELECT deviceId FROM devices";
+    $res = $logConnection->query($sql);
+    $data = array();
+    while ($row = $res->fetch_assoc()) {
+        $data[] = (int)$row['deviceId'];
+    }
+
+    header('Content-type: application/json');
+    echo json_encode($data);
+    return;
+}
+
+if (isset($_GET['getLastValues'])) {
+    if (!isset($_GET['deviceId'])) {
+        die('deviceId not set');
+    }
+
+    $deviceId = $_GET['deviceId'];
+
+    $data = array();
+
+    // Get types for device
+    $sql = "SELECT DISTINCT(type) FROM log WHERE deviceId = {$deviceId}";
+    $res = $logConnection->query($sql);
+    while ($row = $res->fetch_assoc()) {
+        $type = $row['type'];
+
+        $sql = "SELECT dateTime, value, type FROM log WHERE deviceId = {$deviceId} AND type = {$type} ORDER BY recordId DESC LIMIT 1";
+        $res2 = $logConnection->query($sql);
+        while ($row2 = $res2->fetch_assoc()) {
+            $data[] = $row2;
+        }
+    }
+
+    header('Content-type: application/json');
+    echo json_encode($data);
+    return;
+}
+
+if (isset($_GET['getDeviceDesc'])) {
     if (!isset($_GET['deviceId'])) {
         die('deviceId not set');
     }
@@ -21,9 +59,7 @@ if(isset($_GET['getDeviceDesc'])) {
     $sql = "SELECT deviceId, name, friendlyName, sensorName FROM devices WHERE deviceId = $deviceId";
     $res = $logConnection->query($sql);
 
-    $returnedData = $res->fetch_assoc();
-
-    $data = $returnedData;
+    $data = $res->fetch_assoc();
     header('Content-type: application/json');
     echo json_encode($data);
     return;
@@ -70,8 +106,9 @@ if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
         $returnedData[$deviceId][$type][$timestamp_s] = $value;
     }
 
-    $data = $returnedData;
     header('Content-type: application/json');
-    echo json_encode($data);
+    echo json_encode($returnedData);
     return;
 }
+
+die("no command?");
