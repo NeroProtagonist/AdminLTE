@@ -16,6 +16,7 @@ if (isset($_GET['getDeviceIds'])) {
     while ($row = $res->fetch_assoc()) {
         $data[] = (int)$row['deviceId'];
     }
+    $res->free_result();
 
     header('Content-type: application/json');
     echo json_encode($data);
@@ -32,17 +33,19 @@ if (isset($_GET['getLastValues'])) {
     $data = array();
 
     // Get types for device
-    $sql = "SELECT DISTINCT(type) FROM log WHERE deviceId = {$deviceId}";
+    $sql = "SELECT dataTypes FROM devices WHERE deviceId = {$deviceId}";
     $res = $logConnection->query($sql);
-    while ($row = $res->fetch_assoc()) {
-        $type = $row['type'];
-
+    $dataTypes = explode(',', $res->fetch_array()[0]);
+    foreach($dataTypes as $type)
+    {
         $sql = "SELECT dateTime, value, type FROM log WHERE deviceId = {$deviceId} AND type = {$type} ORDER BY recordId DESC LIMIT 1";
         $res2 = $logConnection->query($sql);
         while ($row2 = $res2->fetch_assoc()) {
             $data[] = $row2;
         }
+        $res2->free_result();
     }
+    $res->free_result();
 
     header('Content-type: application/json');
     echo json_encode($data);
@@ -60,6 +63,8 @@ if (isset($_GET['getDeviceDesc'])) {
     $res = $logConnection->query($sql);
 
     $data = $res->fetch_assoc();
+    $res->free_result();
+
     header('Content-type: application/json');
     echo json_encode($data);
     return;
@@ -105,6 +110,7 @@ if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
         // { deviceId => type => timestamp => value }
         $returnedData[$deviceId][$type][$timestamp_s] = $value;
     }
+    $res->free_result();
 
     header('Content-type: application/json');
     echo json_encode($returnedData);
