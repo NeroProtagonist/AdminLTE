@@ -13,28 +13,70 @@
 </div>
 
 <div class="content">
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col-md">
-        <!-- Temp 24 hours -->
-        <div class="card card-primary">
-          <div class="card-header">
-            <h3 class="card-title">Temperature over 24 hours</h3>
-          </div>
-          <div class="card-body">
-            <div class="chart">
-              <canvas id="temp24Chart" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
-            </div>
-          </div>
-        </div> <!-- .card -->
-      </div>
-    </div>
+  <div id="insertPoint" class="container-fluid">
+    <!-- Insertion place for weather sensors -->
+
   </div> <!-- .container-fluid -->
 </div>
 
-<!-- ChartJS -->
-<script src="plugins/chart.js/Chart.min.js"></script>
-<!--<script src="index.js"></script>-->
+<!-- page script -->
+<script>
+  "use strict";
+
+  $(document).ready(function() {
+    // Get list of devices
+    $.getJSON("api_db.php?getDeviceIds",
+      function(data) {
+        // Insert divs for each device so that devices are ordered on page by device Id
+        for (let deviceId of data) {
+          $('#insertPoint').append(`<div id=dev${deviceId}></div>`);
+        }
+
+        for (let deviceId of data) {
+          $.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId,
+            function(desc) {
+              $.getJSON("api_db.php?getLastValues&deviceId=" + deviceId,
+                function(values) {
+                  let txt = `
+                      <h5 class="mb-2">${desc['friendlyName']}</h5>
+                      <div class="row">`
+                  for (let value of values) {
+                    function getDisplaySet(value) {
+                      let val = Number(value['value']);
+                      switch (Number(value['type'])) {
+                        case 0: return { value: val.toFixed(1) + '&#x2103;', type: 'Temperature', bg: 'primary' };
+                        case 1: return { value: val.toFixed(0) + '%', type: 'Relative Humidity', bg: 'secondary' };
+                        case 2: return { value: val.toFixed(1), type: 'Pressure', bg: 'success' };
+                      }
+                    }
+
+                    let displaySet = getDisplaySet(value);
+
+                    txt += `
+                        <div class="col-md-3">
+
+                          <div class="small-box bg-${displaySet.bg}">
+                            <div class="inner">
+                              <h3>${displaySet.value}</h3>
+                              <p>${displaySet.type}</p>
+                            </div>
+                            <div class="icon">
+                              <i class="fas fa-thermometer-half"></i>
+                            </div>
+                            <a href="weather.php" class="small-box-footer">
+                              Data <i class="fas fa-arrow-circle-right"></i>
+                            </a>
+                          </div>
+                        </div>`;
+                  }
+                  txt += `</div>`;
+                  $(`#dev${deviceId}`).append(txt);
+                });
+            });
+        }
+      });
+  });
+</script>
 
 <?php
   require "footer.php"
