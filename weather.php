@@ -228,7 +228,7 @@
 
     let startUTC = Math.trunc(startDate.valueOf() / 1000);
     let endUTC = Math.trunc(endDate.valueOf() / 1000);
-    $.getJSON("api_db.php?getGraphData&weather&from=" + startUTC + "&to=" + endUTC,
+    $.getJSON("api_db.php?getGraphData2&weather&from=" + startUTC + "&to=" + endUTC,
       function (data) {
         let totalNum = 0;
 

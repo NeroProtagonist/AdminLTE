@@ -70,11 +70,8 @@ if (isset($_GET['getDeviceDesc'])) {
     return;
 }
 
-if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
-
-    // TODO: Filter by device-id
-    // TODO: Filter by type
-
+function getSQLTimeLimit()
+{
     // Time limit
     $limit = '';
 
@@ -90,9 +87,62 @@ if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
     // Remove first AND
     $limit = preg_replace('/^ AND/', '', $limit);
 
+    return $limit;
+}
+
+function sqlToTimestamp($dateTime)
+{
+    $time = DateTime::createFromFormat('Y-m-d H:i:s', $dateTime, new DateTimeZone("UTC"));
+    return $time->format('U');
+}
+
+if (isset($_GET['getGraphData2']) && isset($_GET['weather'])) {
+
+    $timeLimit = getSQLTimeLimit();
+
+    $returnedData = array();
+
+    // Get number of samples in devices and types
+    $sql = "SELECT COUNT(*) AS 'numSamples', deviceId, type FROM log WHERE $timeLimit GROUP BY deviceId, type";
+    $res = $logConnection->query($sql);
+    while ($row = $res->fetch_array(MYSQLI_ASSOC)) {
+        $numSamples = $row['numSamples'];
+        $period = max(round($numSamples / 200), 1); // Need about 200 samples
+        $deviceId = $row['deviceId'];
+        $type = $row['type'];
+        $dataSql = "
+            SELECT dateTime, value
+            FROM (
+                SELECT @row := @row + 1 AS rowNum, dateTime, value
+                FROM (SELECT @row := -1) r, log
+                WHERE deviceId = $deviceId AND type = $type AND $timeLimit
+                ) ranked
+            WHERE rowNum % $period = 0
+                ";
+
+        $dataRes = $logConnection->query($dataSql);
+        while ($sampleRow = $dataRes->fetch_array(MYSQLI_NUM)) {
+            $timestamp_s = sqlToTimestamp($sampleRow[0]);
+            $value = $sampleRow[1];
+            // { deviceId => type => timestamp => value }
+            $returnedData[$deviceId][$type][$timestamp_s] = $value;
+        }
+        $dataRes->free_result();
+    }
+    $res->free_result();
+
+    header('Content-type: application/json');
+    echo json_encode($returnedData);
+    return;
+}
+
+if (isset($_GET['getGraphData']) && isset($_GET['weather'])) {
+
+    $timeLimit = getSQLTimeLimit();
+
     $sql = "SELECT dateTime, deviceId, value, type FROM log";
-    if ($limit != '') {
-        $sql .= " WHERE $limit";
+    if ($timeLimit != '') {
+        $sql .= " WHERE $timeLimit";
     }
 
     $res = $logConnection->query($sql);
@@ -102,8 +152,7 @@ if(isset($_GET['getGraphData']) && isset($_GET['weather'])) {
 
     $returnedData = array();
     while ($row = $res->fetch_array(MYSQLI_NUM)) {
-        $time = DateTime::createFromFormat('Y-m-d H:i:s', $row[0], new DateTimeZone("UTC"));
-        $timestamp_s = $time->format('U');
+        $timestamp_s = sqlToTimestamp($row[0]);
         $deviceId = $row[1];
         $value = $row[2];
         $type = $row[3];
