@@ -122,14 +122,7 @@
 <script>
   "use strict";
 
-  var graphs = { "temp": { name: "temp", element: "#tempGraphElement", cardId: 'temp-graph', yBeginAtZero: true },
-                 "humidity": { name: "humidity", element: "#humidityGraph", cardId: 'humidity-graph', yBeginAtZero: true },
-                 "pressure": { name: "pressure", element: "#pressureGraph", cardId: 'pressure-graph', yBeginAtZero: false }
-                };
-
-  $(function () {
-
-    const defaultGraphOptions = {
+  const defaultGraphOptions = {
       maintainAspectRatio: false,
       responsive: true,
       datasetFill: false,
@@ -143,9 +136,6 @@
                 second: 'HH:mm:ss',
                 minute: 'HH:mm',
                 hour: 'HH'
-              },
-              ticks: {
-                //sampleSize: 20
               }
             }
           }
@@ -157,8 +147,22 @@
         }]
       },
       animation: false
-    }
+    };
 
+  var graphs = { "temp": { name: "temp", element: "#tempGraphElement", cardId: 'temp-graph' },
+                "humidity": { name: "humidity", element: "#humidityGraph", cardId: 'humidity-graph' },
+                "pressure": { name: "pressure", element: "#pressureGraph", cardId: 'pressure-graph' }
+              };
+
+  for (let graphName in graphs) {
+    graphs[graphName].options = JSON.parse(JSON.stringify(defaultGraphOptions));
+  }
+
+  graphs['humidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
+  graphs['humidity'].options.scales.yAxes[0].ticks.min = 50;
+  graphs['pressure'].options.scales.yAxes[0].ticks.beginAtZero = false;
+
+  $(function () {
     window.chartColors = {
       red: 'rgb(255, 99, 132)',
       orange: 'rgb(255, 159, 64)',
@@ -173,15 +177,12 @@
       let graph = graphs[graphName];
       let canvas = $(graph.element).get(0).getContext('2d');
 
-      let options = Object.assign({}, defaultGraphOptions);
-      options.scales.yAxes[0].ticks.beginAtZero = graph.yBeginAtZero;
-
       graph.chart = new Chart(canvas, {
         type: 'line',
         data: {
           datasets: []
         },
-        options: defaultGraphOptions
+        options: graph.options
       });
     }
 
@@ -195,8 +196,10 @@
         },
         ranges : {
           'Last 5 minutes'  : [moment().subtract(5, 'minutes'), moment()],
-          'Last 30 minutes' : [moment().subtract(30, 'minutes'), moment()],
+          'Last hour' : [moment().subtract(1, 'hours'), moment()],
+          'Last 6 hours' : [ moment().subtract(6, 'hours'), moment()],
           'Today'       : [moment().startOf('day'), moment()],
+          'Last 24 hours' : [moment().subtract(24, 'hours'), moment()],
           'Yesterday'   : [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
           'Last 7 Days' : [moment().subtract(6, 'days'), moment()],
           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
@@ -220,8 +223,34 @@
     fetchAndUpdate(picker.startDate, picker.endDate, picker.locale.format);
   });
 
+  function deltaString(startDate, endDate) {
+    let millis = endDate.diff(startDate);
+    let str = '';
+    if (millis >= 2 * 24 * 60 * 60 * 1000) {
+      let days = Math.trunc(millis / (24 * 60 * 60 * 1000));
+      str += days + 'd';
+      millis -= days * 24 * 60 * 60 * 1000;
+    }
+    if (millis >= 60 * 60 * 1000) {
+      let hours = Math.trunc(millis / (60 * 60 * 1000));
+      str += hours + 'h';
+      millis -= hours * 60 * 60 * 1000;
+    }
+    if (millis >= 60 * 1000) {
+      let minutes = Math.trunc(millis / (60 * 1000));
+      str += minutes + 'm';
+      millis -= minutes * 60 * 1000;
+    }
+    if (millis >= 1000) {
+      let seconds = Math.trunc(millis / 1000);
+      str += seconds + 's';
+      millis -= seconds * 1000;
+    }
+    return str;
+  }
+
   function fetchAndUpdate(startDate, endDate, dateFormat) {
-    $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + startDate.diff(endDate) + ")");
+    $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + deltaString(startDate, endDate) + ")");
     for (let graphName in graphs) {
       $('#' + graphs[graphName].cardId + ' .overlay').show();
     }
