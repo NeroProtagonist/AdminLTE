@@ -159,7 +159,6 @@
   }
 
   graphs['humidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
-  graphs['humidity'].options.scales.yAxes[0].ticks.min = 50;
   graphs['pressure'].options.scales.yAxes[0].ticks.beginAtZero = false;
 
   $(function () {
@@ -201,6 +200,7 @@
           'Today'       : [moment().startOf('day'), moment()],
           'Last 24 hours' : [moment().subtract(24, 'hours'), moment()],
           'Yesterday'   : [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
+          'Last 48 hours' : [moment().subtract(48, 'hours'), moment()],
           'Last 7 Days' : [moment().subtract(6, 'days'), moment()],
           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
           'This Month'  : [moment().startOf('month'), moment().endOf('month')],
@@ -215,8 +215,20 @@
     )
 
     // Initial fetch
+    const startDateStr = sessionStorage.getItem('startDate');
+    const endDateStr = sessionStorage.getItem('endDate');
+    console.log('startDate: ' + startDateStr);
+
     let picker = $('#querytime').data('daterangepicker');
-    fetchAndUpdate(picker.startDate, picker.endDate, picker.locale.format);
+    let startDate = picker.startDate;
+    let endDate = picker.endDate;
+    if (startDateStr != null && endDateStr != null)
+    {
+
+      startDate = moment(startDateStr, picker.locale.format);
+      endDate = moment(endDateStr, picker.locale.format);
+    }
+    fetchAndUpdate(startDate, endDate, picker.locale.format);
   });
 
   $("#querytime").on("apply.daterangepicker", function (ev, picker) {
@@ -250,6 +262,9 @@
   }
 
   function fetchAndUpdate(startDate, endDate, dateFormat) {
+    sessionStorage.setItem('startDate', startDate.format(dateFormat));
+    sessionStorage.setItem('endDate', endDate.format(dateFormat));
+
     $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + deltaString(startDate, endDate) + ")");
     for (let graphName in graphs) {
       $('#' + graphs[graphName].cardId + ' .overlay').show();
