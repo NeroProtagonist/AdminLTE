@@ -80,6 +80,12 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link <?php if($scriptname === "energy.php") { echo 'active'; } ?>" href="energy.php">
+                <i class="far fa-circle nav-icon"></i>
+                <p>Energy</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link <?php if($scriptname === "airquality.php") { echo 'active'; } ?>" href="airquality.php">
                 <i class="far fa-circle nav-icon"></i>
                 <p>Air Quality</p>
