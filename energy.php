@@ -155,17 +155,15 @@
     )
 
     // Initial fetch
-    const startDateStr = sessionStorage.getItem('energyStartDate');
-    const endDateStr = sessionStorage.getItem('energyEndDate');
+    const deltaSeconds_str = sessionStorage.getItem('energyPreviousDeltaSeconds');
 
     let picker = $('#querytime').data('daterangepicker');
     let startDate = picker.startDate;
     let endDate = picker.endDate;
-    if (startDateStr != null && endDateStr != null)
+    if (deltaSeconds_str != null)
     {
-
-      startDate = moment(startDateStr, picker.locale.format);
-      endDate = moment(endDateStr, picker.locale.format);
+      startDate = moment().subtract(deltaSeconds_str, 'seconds');
+      endDate = moment();
     }
     fetchAndUpdate(startDate, endDate, picker.locale.format);
   });
@@ -175,8 +173,7 @@
   });
 
   function fetchAndUpdate(startDate, endDate, dateFormat) {
-    sessionStorage.setItem('energyStartDate', startDate.format(dateFormat));
-    sessionStorage.setItem('energyEndDate', endDate.format(dateFormat));
+    sessionStorage.setItem('energyPreviousDeltaSeconds', endDate.diff(startDate, 'seconds'));
 
     $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + deltaString(startDate, endDate) + ")");
     for (let graphName in graphs) {
