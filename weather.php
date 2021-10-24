@@ -119,35 +119,12 @@
 <script src="plugins/chart.js/Chart.js"></script>
 <script src="plugins/daterangepicker/daterangepicker.js"></script>
 <!-- page script -->
-<script>
+<script type="module">
   "use strict";
 
-  const defaultGraphOptions = {
-      maintainAspectRatio: false,
-      responsive: true,
-      datasetFill: false,
-      scales: {
-        xAxes: [
-          {
-            type: 'time',
-            time: {
-              minUnit: 'minute',
-              displayFormats: {
-                second: 'HH:mm:ss',
-                minute: 'HH:mm',
-                hour: 'HH'
-              }
-            }
-          }
-        ],
-        yAxes: [{
-          ticks: {
-            beginAtZero: true
-          }
-        }]
-      },
-      animation: false
-    };
+  import { makeDefaultGraphOptions } from './graph.js';
+  import { deltaString } from './graph.js';
+  import { makeDefaultGraphColours } from './graph.js';
 
   var graphs = { "temp": { name: "temp", element: "#tempGraphElement", cardId: 'temp-graph' },
                 "humidity": { name: "humidity", element: "#humidityGraph", cardId: 'humidity-graph' },
@@ -155,22 +132,14 @@
               };
 
   for (let graphName in graphs) {
-    graphs[graphName].options = JSON.parse(JSON.stringify(defaultGraphOptions));
+    graphs[graphName].options = JSON.parse(JSON.stringify(makeDefaultGraphOptions()));
   }
 
   graphs['humidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
   graphs['pressure'].options.scales.yAxes[0].ticks.beginAtZero = false;
 
-  $(function () {
-    window.chartColors = {
-      red: 'rgb(255, 99, 132)',
-      orange: 'rgb(255, 159, 64)',
-      yellow: 'rgb(255, 205, 86)',
-      green: 'rgb(75, 192, 192)',
-      blue: 'rgb(54, 162, 235)',
-      purple: 'rgb(153, 102, 255)',
-      grey: 'rgb(201, 203, 207)'
-    };
+  $(document).ready(function () {
+    window.chartColors = makeDefaultGraphColours();
 
     for (let graphName in graphs) {
       let graph = graphs[graphName];
@@ -217,7 +186,6 @@
     // Initial fetch
     const startDateStr = sessionStorage.getItem('startDate');
     const endDateStr = sessionStorage.getItem('endDate');
-    console.log('startDate: ' + startDateStr);
 
     let picker = $('#querytime').data('daterangepicker');
     let startDate = picker.startDate;
@@ -234,32 +202,6 @@
   $("#querytime").on("apply.daterangepicker", function (ev, picker) {
     fetchAndUpdate(picker.startDate, picker.endDate, picker.locale.format);
   });
-
-  function deltaString(startDate, endDate) {
-    let millis = endDate.diff(startDate);
-    let str = '';
-    if (millis >= 2 * 24 * 60 * 60 * 1000) {
-      let days = Math.trunc(millis / (24 * 60 * 60 * 1000));
-      str += days + 'd';
-      millis -= days * 24 * 60 * 60 * 1000;
-    }
-    if (millis >= 60 * 60 * 1000) {
-      let hours = Math.trunc(millis / (60 * 60 * 1000));
-      str += hours + 'h';
-      millis -= hours * 60 * 60 * 1000;
-    }
-    if (millis >= 60 * 1000) {
-      let minutes = Math.trunc(millis / (60 * 1000));
-      str += minutes + 'm';
-      millis -= minutes * 60 * 1000;
-    }
-    if (millis >= 1000) {
-      let seconds = Math.trunc(millis / 1000);
-      str += seconds + 's';
-      millis -= seconds * 1000;
-    }
-    return str;
-  }
 
   function fetchAndUpdate(startDate, endDate, dateFormat) {
     sessionStorage.setItem('startDate', startDate.format(dateFormat));
