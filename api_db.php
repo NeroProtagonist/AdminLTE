@@ -1,15 +1,16 @@
 <?php
 
 $dbpassFile = fopen('dbpass', 'r') or die('Unable to open file');
-$dbpass = fgets($dbpassFile);
+$sensorDBPass = fgets($dbpassFile);
 fclose($dbpassFile);
-//$logConnection = new mysqli('frambo', 'logger', $dbpass, 'sensorLogs');
-$logConnection = new mysqli('furion', 'logViewer', $dbpass, 'sensorLogs');
+//$logConnection = new mysqli('frambo', 'logger', $sensorDBPass, 'sensorLogs');
+$logConnection = new mysqli('furion', 'logViewer', $sensorDBPass, 'sensorLogs');
 if ($logConnection->connect_errno) {
     die("Failed to connect to server: (" . $logConnection->connect_errno . ") " . $logConnection->connect_error);
 }
 
 if (isset($_GET['getDeviceIds'])) {
+    $logConnection->select_db("sensorLogs");
     $sql = "SELECT deviceId FROM devices";
     $res = $logConnection->query($sql);
     $data = array();
@@ -33,6 +34,7 @@ if (isset($_GET['getLastValues'])) {
     $data = array();
 
     // Get types for device
+    $logConnection->select_db("sensorLogs");
     $sql = "SELECT dataTypes FROM devices WHERE deviceId = {$deviceId}";
     $res = $logConnection->query($sql);
     $dataTypes = explode(',', $res->fetch_array()[0]);
@@ -59,6 +61,7 @@ if (isset($_GET['getDeviceDesc'])) {
 
     $deviceId = $_GET['deviceId'];
 
+    $logConnection->select_db("sensorLogs");
     $sql = "SELECT deviceId, name, friendlyName, sensorName FROM devices WHERE deviceId = $deviceId";
     $res = $logConnection->query($sql);
 
@@ -103,6 +106,7 @@ if (isset($_GET['getGraphData2']) && isset($_GET['weather'])) {
     $returnedData = array();
 
     // Get number of samples in devices and types
+    $logConnection->select_db("sensorLogs");
     $sql = "SELECT COUNT(*) AS 'numSamples', deviceId, type FROM log WHERE $timeLimit GROUP BY deviceId, type";
     $res = $logConnection->query($sql);
     while ($row = $res->fetch_array(MYSQLI_ASSOC)) {
@@ -140,6 +144,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['weather'])) {
 
     $timeLimit = getSQLTimeLimit();
 
+    $logConnection->select_db("sensorLogs");
     $sql = "SELECT dateTime, deviceId, value, type FROM log";
     if ($timeLimit != '') {
         $sql .= " WHERE $timeLimit";
@@ -160,6 +165,33 @@ if (isset($_GET['getGraphData']) && isset($_GET['weather'])) {
         $returnedData[$deviceId][$type][$timestamp_s] = $value;
     }
     $res->free_result();
+
+    header('Content-type: application/json');
+    echo json_encode($returnedData);
+    return;
+}
+
+if (isset($_GET['getGraphData']) && isset($_GET['energy'])) {
+    $timeLimit = getSQLTimeLimit();
+
+    $logConnection->select_db("solarLogs");
+    $sql = "SELECT dateTime, current_w, lifetime_wh FROM log";
+    if ($timeLimit != '') {
+        $sql .= " WHERE $timeLimit";
+    }
+
+    $res = $logConnection->query($sql);
+    if (!$res) {
+        die("Table query failed: (" . $logConnection->errno . ") " . $logConnection->error);
+    }
+
+    $returnedData = array();
+    $returnedData = $res->fetch_all(MYSQLI_ASSOC);
+    $res->free_result();
+
+    foreach ($returnedData as &$data) {
+        $data['dateTime'] = sqlToTimestamp($data['dateTime']);
+    }
 
     header('Content-type: application/json');
     echo json_encode($returnedData);
