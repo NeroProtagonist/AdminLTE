@@ -91,8 +91,8 @@
 
 <!-- ChartJS -->
 <script src="plugins/moment/moment.min.js"></script>
-<!-- <script src="plugins/chart.js/Chart.min.js"></script> -->
-<script src="plugins/chart.js/Chart.js"></script>
+<script src="plugins/chart.js/Chart.min.js"></script>
+<!--<script src="plugins/chart.js/Chart.js"></script>-->
 <script src="plugins/daterangepicker/daterangepicker.js"></script>
 <!-- page script -->
 <script type="module">
@@ -101,13 +101,13 @@
   import { makeDefaultGraphOptions } from './graph.js';
   import { deltaString } from './graph.js';
   import { makeDefaultGraphColours } from './graph.js';
+  import { makeDefaultTimePickerOptions} from './graph.js';
 
   var graphs = { "solarPower": { name: "solarPower", type: 'line', element: "#solarPowerGraphElement", cardId: 'solar-power-graph', label: 'Power output (W)' },
                 "solarEnergy": { name: "solarEnergy", type: 'bar', element: "#solarEnergyGraphElement", cardId: 'solar-energy-graph', label: 'Energy produced (Wh)' }
                 };
   for (let graphName in graphs) {
     graphs[graphName].options = JSON.parse(JSON.stringify(makeDefaultGraphOptions()));
-    //graphs[graphName].options.scales.xAxes[0].ticks = { source: 'labels' };
   }
 
   $(document).ready(function () {
@@ -125,34 +125,7 @@
       });
     }
 
-    $('#querytime').daterangepicker(
-      {
-        timePicker: true,
-        timePickerIncrement: 15,
-        timePicker24Hour: true,
-        locale: {
-          format: "DD/MM/YYYY HH:mm"
-        },
-        ranges : {
-          'Last 5 minutes'  : [moment().subtract(5, 'minutes'), moment()],
-          'Last hour' : [moment().subtract(1, 'hours'), moment()],
-          'Last 6 hours' : [ moment().subtract(6, 'hours'), moment()],
-          'Today'       : [moment().startOf('day'), moment()],
-          'Last 24 hours' : [moment().subtract(24, 'hours'), moment()],
-          'Yesterday'   : [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
-          'Last 48 hours' : [moment().subtract(48, 'hours'), moment()],
-          'Last 7 Days' : [moment().subtract(6, 'days'), moment()],
-          'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-          'This Month'  : [moment().startOf('month'), moment().endOf('month')],
-          'This Year'   : [moment().startOf("year"), moment()],
-          'All Time'    : [moment(0), moment()]
-        },
-        startDate: moment().subtract(1, 'hours'), // Default
-        endDate: moment(),
-        opens: 'center',
-        autoUpdateInput: false
-      }
-    )
+    $('#querytime').daterangepicker(makeDefaultTimePickerOptions());
 
     // Initial fetch
     const deltaSeconds_str = sessionStorage.getItem('energyPreviousDeltaSeconds');
@@ -198,25 +171,26 @@
           };
         }
 
-        let previousLifetime_wh = data[0].lifetime_wh;
-        $.each(data,
-          function(index, entry) {
-            graphs['solarPower'].chart.data.datasets[0].data.push(entry.current_w);
-            graphs['solarPower'].chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+        graphs['solarEnergy'].chart.data.datasets[0].barThickness = 'flex';
 
-            let deltaEnergy = entry.lifetime_wh - previousLifetime_wh;
-            previousLifetime_wh = entry.lifetime_wh;
-            if (deltaEnergy != 0 || entry.current_w == 0)
-            {
-              graphs['solarEnergy'].chart.data.datasets[0].data.push(deltaEnergy);
-              graphs['solarEnergy'].chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+        if (data.length > 0) {
+          let previousLifetime_wh = data[0].lifetime_wh;
+          $.each(data,
+            function(index, entry) {
+              graphs['solarPower'].chart.data.datasets[0].data.push(entry.current_w);
+              graphs['solarPower'].chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+
+              let deltaEnergy = entry.lifetime_wh - previousLifetime_wh;
+              previousLifetime_wh = entry.lifetime_wh;
+              if (deltaEnergy != 0 || entry.current_w == 0)
+              {
+                graphs['solarEnergy'].chart.data.datasets[0].data.push(deltaEnergy);
+                graphs['solarEnergy'].chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+              }
+              else { console.log('Skipping it...'); }
             }
-            else { console.log('Skipping it...'); }
-          }
-        );
-
-        console.log(graphs['solarEnergy'].chart.data.datasets[0].data);
-        console.log(graphs['solarEnergy'].chart.data.labels);
+          );
+        }
 
         for (let graphName in graphs) {
           let graph = graphs[graphName];

@@ -115,8 +115,8 @@
 
 <!-- ChartJS -->
 <script src="plugins/moment/moment.min.js"></script>
-<!-- <script src="plugins/chart.js/Chart.min.js"></script> -->
-<script src="plugins/chart.js/Chart.js"></script>
+<script src="plugins/chart.js/Chart.min.js"></script>
+<!--<script src="plugins/chart.js/Chart.js"></script>-->
 <script src="plugins/daterangepicker/daterangepicker.js"></script>
 <!-- page script -->
 <script type="module">
@@ -125,6 +125,7 @@
   import { makeDefaultGraphOptions } from './graph.js';
   import { deltaString } from './graph.js';
   import { makeDefaultGraphColours } from './graph.js';
+  import { makeDefaultTimePickerOptions} from './graph.js';
 
   var graphs = { "temp": { name: "temp", element: "#tempGraphElement", cardId: 'temp-graph' },
                 "humidity": { name: "humidity", element: "#humidityGraph", cardId: 'humidity-graph' },
@@ -154,34 +155,7 @@
       });
     }
 
-    $('#querytime').daterangepicker(
-      {
-        timePicker: true,
-        timePickerIncrement: 15,
-        timePicker24Hour: true,
-        locale: {
-          format: "DD/MM/YYYY HH:mm"
-        },
-        ranges : {
-          'Last 5 minutes'  : [moment().subtract(5, 'minutes'), moment()],
-          'Last hour' : [moment().subtract(1, 'hours'), moment()],
-          'Last 6 hours' : [ moment().subtract(6, 'hours'), moment()],
-          'Today'       : [moment().startOf('day'), moment()],
-          'Last 24 hours' : [moment().subtract(24, 'hours'), moment()],
-          'Yesterday'   : [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
-          'Last 48 hours' : [moment().subtract(48, 'hours'), moment()],
-          'Last 7 Days' : [moment().subtract(6, 'days'), moment()],
-          'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-          'This Month'  : [moment().startOf('month'), moment().endOf('month')],
-          'This Year'   : [moment().startOf("year"), moment()],
-          'All Time'    : [moment(0), moment()]
-        },
-        startDate: moment().subtract(1, 'hours'), // Default
-        endDate: moment(),
-        opens: 'center',
-        autoUpdateInput: false
-      }
-    )
+    $('#querytime').daterangepicker(makeDefaultTimePickerOptions());
 
     // Initial fetch
     const deltaSeconds_str = sessionStorage.getItem('weatherPreviousDeltaSeconds');
@@ -211,7 +185,7 @@
 
     let startUTC = Math.trunc(startDate.valueOf() / 1000);
     let endUTC = Math.trunc(endDate.valueOf() / 1000);
-    $.getJSON("api_db.php?getGraphData2&weather&from=" + startUTC + "&to=" + endUTC,
+    $.getJSON("api_db.php?getGraphData3&weather&from=" + startUTC + "&to=" + endUTC,
       function (data) {
         let totalNum = 0;
 
@@ -226,6 +200,12 @@
 
         $.each(data,
           function(deviceId, rec0) {
+
+            if (deviceId === 'debug') {
+              console.log(rec0);
+              return;
+            }
+
             if (!indexToDevice.includes(deviceId)) {
               indexToDevice[nextIndex] = deviceId;
               nextIndex++;

@@ -73,17 +73,24 @@ if (isset($_GET['getDeviceDesc'])) {
     return;
 }
 
+function getQueryTimespan()
+{
+    $fromTime = new DateTime("@{$_GET['from']}");
+    $toTime = new DateTime("@{$_GET['to']}");
+    return array($fromTime, $toTime);
+}
+
 function getSQLTimeLimit()
 {
     // Time limit
     $limit = '';
 
+    list($fromTime, $toTime) = getQueryTimespan();
+
     if (isset($_GET['from'])) {
-        $fromTime = new DateTime("@{$_GET['from']}");
         $limit .= ' AND dateTime >= "' . $fromTime->format('Y-m-d H:i:s') . '"';
     }
     if (isset($_GET["to"])) {
-        $toTime = new DateTime("@{$_GET['to']}");
         $limit .= ' AND dateTime <= "' . $toTime->format('Y-m-d H:i:s') . '"';
     }
 
@@ -134,6 +141,52 @@ if (isset($_GET['getGraphData2']) && isset($_GET['weather'])) {
         $dataRes->free_result();
     }
     $res->free_result();
+
+    header('Content-type: application/json');
+    echo json_encode($returnedData);
+    return;
+}
+
+if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
+
+    # Requires from+to
+    if (!isset($_GET['from']) || !isset($_GET['to'])) {
+        die('Needs from and to');
+    }
+
+    $timeLimit = getSQLTimeLimit();
+
+    $logConnection->select_db("sensorLogs");
+    $sql = "SELECT dateTime, deviceId, value, type FROM log WHERE";
+    if ($timeLimit != '') {
+        $sql .= " $timeLimit AND";
+    }
+
+    list($fromTime, $toTime) = getQueryTimespan();
+    $delta_s = abs($fromTime->getTimestamp() - $toTime->getTimestamp());
+    $interval_s = $delta_s / 200;
+    $interval_s = (int)((int)($interval_s) / 5) * 5;
+    $sql .= " TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 % $interval_s = 0";
+
+    $res = $logConnection->query($sql);
+    if (!$res) {
+        die("Table query failed: (" . $logConnection->errno . ") " . $logConnection->error);
+    }
+
+    $returnedData = array();
+    while ($row = $res->fetch_array(MYSQLI_NUM)) {
+        $timestamp_s = sqlToTimestamp($row[0]);
+        $deviceId = $row[1];
+        $value = $row[2];
+        $type = $row[3];
+        // { deviceId => type => timestamp => value }
+        $returnedData[$deviceId][$type][$timestamp_s] = $value;
+    }
+    $res->free_result();
+
+    //$returnedData['debug']['delta_s'] = $delta_s;
+    //$returnedData['debug']['interval_s'] = $interval_s;
+    //$returnedData['debug']['sql'] = $sql;
 
     header('Content-type: application/json');
     echo json_encode($returnedData);

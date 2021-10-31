@@ -12,9 +12,9 @@ export function makeDefaultGraphOptions() {
               displayFormats: {
                 second: 'HH:mm:ss',
                 minute: 'HH:mm',
-                hour: 'HH'
+                hour: 'HH:mm'
               }
-            },
+            }
           }
         ],
         yAxes: [{
@@ -64,5 +64,34 @@ export function makeDefaultGraphColours() {
     blue: 'rgb(54, 162, 235)',
     purple: 'rgb(153, 102, 255)',
     grey: 'rgb(201, 203, 207)'
+  };
+}
+
+export function makeDefaultTimePickerOptions() {
+  return {
+    timePicker: true,
+    timePickerIncrement: 15,
+    timePicker24Hour: true,
+    locale: {
+      format: "DD/MM/YYYY HH:mm"
+    },
+    ranges : {
+      'Last 5 minutes'  : [moment().subtract(5, 'minutes'), moment()],
+      'Last hour' : [moment().subtract(1, 'hours'), moment()],
+      'Last 6 hours' : [ moment().subtract(6, 'hours'), moment()],
+      'Today'       : [moment().startOf('day'), moment()],
+      'Last 24 hours' : [moment().subtract(24, 'hours'), moment()],
+      'Yesterday'   : [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
+      'Last 48 hours' : [moment().subtract(48, 'hours'), moment()],
+      'Last 7 Days' : [moment().subtract(7, 'days'), moment()],
+      'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+      'This Month'  : [moment().startOf('month'), moment().endOf('month')],
+      'This Year'   : [moment().startOf("year"), moment()],
+      'All Time'    : [moment(0), moment()]
+    },
+    startDate: moment().subtract(1, 'hours'), // Default
+    endDate: moment(),
+    opens: 'center',
+    autoUpdateInput: false
   };
 }
