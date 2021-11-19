@@ -19,10 +19,47 @@
 </div>
 
 <div class="content">
-  <div id="insertPoint" class="container-fluid">
-    <!-- Insertion place for weather sensors -->
+  <div class="card" class="container-fluid">
+    <div class="card-header">
+      <h3 class="card-title">
+        Weather
+      </h3>
+    </div>
+    <div class="card-body">
+      <div id="weatherInsert">
+        <!-- Insertion place for weather sensors -->
 
-  </div> <!-- .container-fluid -->
+      </div> <!-- .container-fluid -->
+    </div>
+  </div>
+
+  <div class="card" class="container-fluid">
+    <div class="card-header">
+      <h3 class="card-title">
+        Meter
+      </h3>
+    </div>
+    <div class="card-body">
+      <div id="meterInsert">
+        <!-- Insertion place for energy meter data -->
+
+      </div> <!-- .container-fluid -->
+    </div>
+  </div>
+
+  <div class="card" class="container-fluid">
+    <div class="card-header">
+      <h3 class="card-title">
+        Solar
+      </h3>
+    </div>
+    <div class="card-body">
+      <div id="solarInsert">
+        <!-- Insertion place for solar data -->
+
+      </div> <!-- .container-fluid -->
+    </div>
+  </div>
 </div>
 
 <!-- Bootstrap Switch -->
@@ -32,19 +69,29 @@
 <script>
   "use strict";
 
-  let statsRefresh;
-
   let devs = [];
+
+  function getWeatherDisplaySet(deviceId, value) {
+    let val = Number(value['value']);
+    switch (Number(value['type'])) {
+      case 0: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(1) + '&#x2103;', type: 'Temperature', bg: 'primary' };
+      case 1: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0) + '%', type: 'Relative Humidity', bg: 'secondary' };
+      case 2: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(1), type: 'Pressure', bg: 'success' };
+    }
+  }
+
+  let energyStatsLayout = [ [ 9, 10 ], [ 4, 5 ], [ 33 ], [ 6, 7 ] ];
+  let energyStatsRowDesc = [ 'Power', 'Elec received', 'Gas', 'Elec sent' ];
 
   function initStats() {
     $.getJSON("api_db.php?getDeviceIds",
       function(data) {
         // Clear everything under insertion point
-        $('#insertPoint').empty();
+        $('#weatherInsert').empty();
 
         // Insert divs for each device so that devices are ordered on page by device Id
         for (let deviceId of data) {
-          $('#insertPoint').append(`<div id=dev${deviceId}></div>`);
+          $('#weatherInsert').append(`<div id=dev${deviceId}></div>`);
         }
 
         devs = data;
@@ -52,15 +99,15 @@
         for (let deviceId of devs) {
           $.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId,
             function(desc) {
-              $.getJSON("api_db.php?getLastValues&deviceId=" + deviceId,
+              $.getJSON("api_db.php?getLastValues&weather&deviceId=" + deviceId,
                 function(values) {
                   // Device name
                   let txt = `
                     <h5 class="mb-2">${desc['friendlyName']}</h5>
                     <div class="row">`;
                   for (let value of values) {
-                    let displaySet = getDisplaySet(deviceId, value);
-                    // One card per stat on the same row
+                    let displaySet = getWeatherDisplaySet(deviceId, value);
+                    // One box per stat on the same row
                     txt += `
                       <div class="col-md-3">
                         <div class="small-box bg-${displaySet.bg}">
@@ -79,41 +126,78 @@
                   }
                   txt += `</div>`;
                   $(`#dev${deviceId}`).append(txt);
-                }); // getLastValues
+                }); // getLastValues&weather
             }); // getDeviceDesc
         }
       }); // getDeviceIds
-  }
 
-  function getDisplaySet(deviceId, value) {
-    let val = Number(value['value']);
-    switch (Number(value['type'])) {
-      case 0: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(1) + '&#x2103;', type: 'Temperature', bg: 'primary' };
-      case 1: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0) + '%', type: 'Relative Humidity', bg: 'secondary' };
-      case 2: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(1), type: 'Pressure', bg: 'success' };
-    }
-  }
-
-  function updateStats() {
-    for (let deviceId of devs) {
-      $.getJSON("api_db.php?getLastValues&deviceId=" + deviceId,
-        function(values) {
-          for (let value of values) {
-            let displaySet = getDisplaySet(deviceId, value);
-            $(`#${displaySet.id}`).html(displaySet.value);
+    $('#meterInsert').empty()
+    $.getJSON("api_db.php?getLastValues&meter",
+      function(stats) {
+        let row = 0;
+        for (let statRow in energyStatsLayout) {
+          let txt = `
+            <h5 class="mb-2">${energyStatsRowDesc[row]}</h5>
+            <div class="row">`;
+          for (let stat of energyStatsLayout[statRow]) {
+            let s = stats[stat];
+            txt += `
+              <div class="col-md-6">
+                <div class="small-box bg-primary">
+                  <div class="inner">
+                    <h3 id="meter_${s['stat']}">${s['value']}</h3>
+                    <p>${s['description']}</p>
+                  </div>
+                </div>
+              </div>
+              `;
           }
-        });
-    }
+          txt += `</div>`;
+          $('#meterInsert').append(txt)
+          ++row;
+        }
+      }); // getLastValues&meter
   }
+
+  let statsRefresh = [
+    { updateFunc: function() {
+                    for (let deviceId of devs) {
+                      $.getJSON("api_db.php?getLastValues&weather&deviceId=" + deviceId,
+                        function(values) {
+                          for (let value of values) {
+                            let displaySet = getDisplaySet(deviceId, value);
+                            $(`#${displaySet.id}`).html(displaySet.value);
+                          }
+                        });
+                    }
+                  },
+      period: 5000
+    },
+    {
+      updateFunc: function() {
+                    $.getJSON("api_db.php?getLastValues&meter",
+                      function(stats) {
+                        for (let stat of stats) {
+                          $(`#meter_${stat['stat']}`).html(stat['value']);
+                        }
+                      }); // getLastValues&meter
+                  },
+      period: 1000
+    }
+  ];
 
   $(document).ready(function() {
 
     $("[name='refreshStats'").bootstrapSwitch();
     $("[name='refreshStats'").on('switchChange.bootstrapSwitch', function(event, state) {
       if (state) {
-        statsRefresh = setInterval(updateStats, 5000);
+        for (let s of statsRefresh) {
+          s.timer = setInterval(s.updateFunc, s.period);
+        }
       } else {
-        clearInterval(statsRefresh);
+        for (let s of statsRefresh) {
+          clearInterval(s.timer);
+        }
       }
     });
 
