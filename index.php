@@ -80,6 +80,10 @@
     }
   }
 
+  function getMeterDisplaySet(value) {
+    return { id: `meter_${value['stat']}`, text : `${value['value']} ${value['unit']}` };
+  }
+
   let energyStatsLayout = [ [ 9, 10 ], [ 4, 5 ], [ 33 ], [ 6, 7 ] ];
   let energyStatsRowDesc = [ 'Power', 'Elec received', 'Gas', 'Elec sent' ];
 
@@ -140,13 +144,13 @@
             <h5 class="mb-2">${energyStatsRowDesc[row]}</h5>
             <div class="row">`;
           for (let stat of energyStatsLayout[statRow]) {
-            let s = stats[stat];
+            let displaySet = getMeterDisplaySet(stats[stat]);
             txt += `
               <div class="col-md-6">
                 <div class="small-box bg-primary">
                   <div class="inner">
-                    <h3 id="meter_${s['stat']}">${s['value']}</h3>
-                    <p>${s['description']}</p>
+                    <h3 id="${displaySet.id}">${displaySet.text}</h3>
+                    <p>${stats[stat]['description']}</p>
                   </div>
                 </div>
               </div>
@@ -165,7 +169,7 @@
                       $.getJSON("api_db.php?getLastValues&weather&deviceId=" + deviceId,
                         function(values) {
                           for (let value of values) {
-                            let displaySet = getDisplaySet(deviceId, value);
+                            let displaySet = getWeatherDisplaySet(deviceId, value);
                             $(`#${displaySet.id}`).html(displaySet.value);
                           }
                         });
@@ -177,8 +181,9 @@
       updateFunc: function() {
                     $.getJSON("api_db.php?getLastValues&meter",
                       function(stats) {
-                        for (let stat of stats) {
-                          $(`#meter_${stat['stat']}`).html(stat['value']);
+                        for (let stat in stats) {
+                          let displaySet = getMeterDisplaySet(stats[stat]);
+                          $(`#${displaySet.id}`).html(displaySet.text);
                         }
                       }); // getLastValues&meter
                   },
