@@ -57,7 +57,7 @@ if (isset($_GET['getLastValues']) && isset($_GET['weather'])) {
 if (isset($_GET['getLastValues']) && isset($_GET['meter'])) {
     // Fetch all stats
     $logConnection->select_db("meterLogs");
-    $sql = "SELECT l.stat, l.dateTime, l.value, stats.description FROM log l INNER JOIN (SELECT MAX(recordId) rec FROM log GROUP BY stat) recent ON l.recordId = recent.rec INNER JOIN stats ON l.stat = stats.stat";
+    $sql = "SELECT l.stat, l.dateTime, l.value, stats.unit, stats.description FROM log l INNER JOIN (SELECT MAX(recordId) rec FROM log GROUP BY stat) recent ON l.recordId = recent.rec INNER JOIN stats ON l.stat = stats.stat";
     $res = $logConnection->query($sql);
 
     $data = array();
