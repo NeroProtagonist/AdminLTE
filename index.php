@@ -152,6 +152,12 @@
                     <h3 id="${displaySet.id}">${displaySet.text}</h3>
                     <p>${stats[stat]['description']}</p>
                   </div>
+                  <div class="icon">
+                    <i class="fas fa-bolt"></i>
+                  </div>
+                  <a href="energy.php" class="small-box-footer">
+                    Data <i class="fas fa-arrow-circle-right"></i>
+                  </a>
                 </div>
               </div>
               `;
