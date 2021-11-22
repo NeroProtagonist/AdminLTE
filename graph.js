@@ -1,5 +1,21 @@
-export function makeDefaultGraphOptions() {
-  const defaultGraphOptions = {
+export class Graph {
+  constructor(type, prefix, label) {
+    this.type = type;
+    this.prefix = prefix;
+    this.label = label;
+    this.options = JSON.parse(JSON.stringify(this.makeDefaultGraphOptions()));
+  }
+
+  getElement() {
+    return `${this.prefix}-graph-element`;
+  }
+
+  getCardId() {
+    return `${this.prefix}-graph`;
+  }
+
+  makeDefaultGraphOptions() {
+    const defaultGraphOptions = {
       maintainAspectRatio: false,
       responsive: true,
       datasetFill: false,
@@ -26,8 +42,10 @@ export function makeDefaultGraphOptions() {
       animation: false
     };
 
-  return defaultGraphOptions;
-}
+    return defaultGraphOptions;
+  }
+
+};
 
 export function deltaString(startDate, endDate) {
   let millis = endDate.diff(startDate);

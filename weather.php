@@ -1,5 +1,6 @@
 <?php
-  require "header.php"
+  require "header.php";
+  require "chart.php";
 ?>
 
 <div class="content-header">
@@ -39,74 +40,11 @@
       </div>
     </div>
 
-    <div class="row">
-      <div class="col-md">
-        <!-- Main chart -->
-        <div class="card card-primary" id="temp-graph">
-          <div class="card-header">
-            <h3 class="card-title">Temperature</h3>
-              <div class="card-tools"> <!-- TODO: Probably unneeded -->
-                <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i>
-                </button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="chart">
-              <canvas id="tempGraphElement" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
-            </div>
-          </div> <!-- /.card-body -->
-          <div class="overlay">
-            <i class="fas fa-2x fa-sync-alt fa-spin"></i>
-          </div> <!-- /.overlay -->
-        </div> <!-- /.card -->
-      </div>
-    </div> <!-- row -->
-
-    <div class="row">
-      <div class="col-md">
-        <!-- Main chart -->
-        <div class="card card-primary" id="humidity-graph">
-          <div class="card-header">
-            <h3 class="card-title">Humidity</h3>
-              <div class="card-tools"> <!-- TODO: Probably unneeded -->
-                <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i>
-                </button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="chart">
-              <canvas id="humidityGraph" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
-            </div>
-          </div> <!-- /.card-body -->
-          <div class="overlay">
-            <i class="fas fa-2x fa-sync-alt fa-spin"></i>
-          </div> <!-- /.overlay -->
-        </div> <!-- /.card -->
-      </div>
-    </div> <!-- row -->
-
-    <div class="row">
-      <div class="col-md">
-        <!-- Main chart -->
-        <div class="card card-primary" id="pressure-graph">
-          <div class="card-header">
-            <h3 class="card-title">Pressure</h3>
-              <div class="card-tools"> <!-- TODO: Probably unneeded -->
-                <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i>
-                </button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="chart">
-              <canvas id="pressureGraph" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
-            </div>
-          </div> <!-- /.card-body -->
-          <div class="overlay">
-            <i class="fas fa-2x fa-sync-alt fa-spin"></i>
-          </div> <!-- /.overlay -->
-        </div> <!-- /.card -->
-      </div>
-    </div> <!-- row -->
+    <?php
+      newChart("temp", "Temperature");
+      newChart("humidity", "Humidity");
+      newChart("pressure", "Pressure");
+    ?>
 
   </div><!-- /.container-fluid -->
 </div>
@@ -122,19 +60,15 @@
 <script type="module">
   "use strict";
 
-  import { makeDefaultGraphOptions } from './graph.js';
   import { deltaString } from './graph.js';
   import { makeDefaultGraphColours } from './graph.js';
   import { makeDefaultTimePickerOptions} from './graph.js';
+  import { Graph } from './graph.js';
 
-  var graphs = { "temp": { name: "temp", element: "#tempGraphElement", cardId: 'temp-graph' },
-                "humidity": { name: "humidity", element: "#humidityGraph", cardId: 'humidity-graph' },
-                "pressure": { name: "pressure", element: "#pressureGraph", cardId: 'pressure-graph' }
+  var graphs = { "temp": new Graph('line', 'temp', ''),
+                 "humidity": new Graph('line', 'humidity', ''),
+                 "pressure": new Graph('line', 'pressure', '')
               };
-
-  for (let graphName in graphs) {
-    graphs[graphName].options = JSON.parse(JSON.stringify(makeDefaultGraphOptions()));
-  }
 
   graphs['humidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
   graphs['pressure'].options.scales.yAxes[0].ticks.beginAtZero = false;
@@ -144,10 +78,11 @@
 
     for (let graphName in graphs) {
       let graph = graphs[graphName];
-      let canvas = $(graph.element).get(0).getContext('2d');
+
+      let canvas = $(`#${graph.getElement()}`).get(0).getContext('2d');
 
       graph.chart = new Chart(canvas, {
-        type: 'line',
+        type: graph.type,
         data: {
           datasets: []
         },
@@ -180,7 +115,7 @@
 
     $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + deltaString(startDate, endDate) + ")");
     for (let graphName in graphs) {
-      $('#' + graphs[graphName].cardId + ' .overlay').show();
+      $(`#${graphs[graphName].getCardId()} .overlay`).show();
     }
 
     let startUTC = Math.trunc(startDate.valueOf() / 1000);
@@ -266,7 +201,7 @@
           for (let graphName in graphs) {
             let graph = graphs[graphName];
             graph.chart.update();
-            $('#' + graph.cardId + ' .overlay').hide();
+            $(`#${graph.getCardId()} .overlay`).hide();
           }
         });
       } // Json handler

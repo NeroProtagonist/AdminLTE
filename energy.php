@@ -1,22 +1,54 @@
 <?php
-  require "header.php"
+  require "header.php";
+  require "chart.php";
 ?>
 
+<!-- Meter -->
 <div class="content-header">
   <div class="container-fluid">
-    <div class="row mb-2">
-      <div class="col-sm">
-        <h1 class="m-0 text-dark">Energy</h1>
-      </div>
-    </div>
+    <h1>Meter</h1>
   </div>
 </div>
 
-<!-- Main content -->
-<div class="content">
+<section class="content">
   <div class="container-fluid">
 
-  <div class="row">
+    <div class="row">
+      <div class="col-md-12">
+        <!-- Time selection card -->
+        <div class="card card-primary">
+          <div class="card-header">
+            <h3 class="card-title">
+              Select period
+            </h3>
+          </div> <!-- .card-header -->
+          <div class="card-body">
+            <select class="form-control">
+              <option>15 minutes</option>
+              <option>Hourly</option>
+              <option>Daily</option>
+            </select>
+          </div> <!-- .card-body -->
+        </div> <!-- .card -->
+      </div>
+    </div> <!-- .row -->
+
+    <?php
+      newChart("meter-elec-received", "Elec Received");
+    ?>
+  </div> <!-- .container-fluid -->
+</section>
+
+<!-- Solar -->
+<div class="content-header">
+  <div class="container-fluid">
+    <h1>Solar</h1>
+  </div>
+</div>
+
+<section class="content">
+  <div class="container-fluid">
+    <div class="row">
       <div class="col-md-12"> <!-- md-12 vs md??? -->
         <!-- Time selection card -->
         <div class="card card-primary">
@@ -34,60 +66,18 @@
               </div>
               <input type="button" class="form-control pull-right" id="querytime" value="Click to select date and time range">
             </div>
-          </div> <!-- .box-body -->
-        </div> <!-- .box -->
+          </div> <!-- .card-body -->
+        </div> <!-- .card -->
       </div>
-    </div>
+    </div><!-- .row -->
 
-    <div class="row">
-      <div class="col-md">
-        <!-- Main chart -->
-        <div class="card card-primary" id="solar-power-graph">
-          <div class="card-header">
-            <h3 class="card-title">Solar Power</h3>
-              <div class="card-tools"> <!-- TODO: Probably unneeded -->
-                <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i>
-                </button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="chart">
-              <canvas id="solarPowerGraphElement" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
-            </div>
-          </div> <!-- /.card-body -->
-          <div class="overlay">
-            <i class="fas fa-2x fa-sync-alt fa-spin"></i>
-          </div> <!-- /.overlay -->
-        </div> <!-- /.card -->
-      </div>
-    </div> <!-- row -->
+    <?php
+      newChart("solar-power", "Solar Power");
+      newCHart("solar-energy", "Solar Energy")
+    ?>
 
-    <div class="row">
-      <div class="col-md">
-        <!-- Main chart -->
-        <div class="card card-primary" id="solar-energy-graph">
-          <div class="card-header">
-            <h3 class="card-title">Solar Energy</h3>
-              <div class="card-tools"> <!-- TODO: Probably unneeded -->
-                <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i>
-                </button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="chart">
-              <canvas id="solarEnergyGraphElement" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
-            </div>
-          </div> <!-- /.card-body -->
-          <div class="overlay">
-            <i class="fas fa-2x fa-sync-alt fa-spin"></i>
-          </div> <!-- /.overlay -->
-        </div> <!-- /.card -->
-      </div>
-    </div> <!-- row -->
-    </div><!-- /.container-fluid -->
-</div>
-<!-- /.content -->
-</div>
+  </div><!-- /.container-fluid -->
+</section><!-- /.content -->
 
 <!-- ChartJS -->
 <script src="plugins/moment/moment.min.js"></script>
@@ -98,22 +88,29 @@
 <script type="module">
   "use strict";
 
-  import { makeDefaultGraphOptions } from './graph.js';
   import { deltaString } from './graph.js';
   import { makeDefaultGraphColours } from './graph.js';
   import { makeDefaultTimePickerOptions} from './graph.js';
+  import { Graph } from './graph.js';
 
-  var graphs = { "solarPower": { name: "solarPower", type: 'line', element: "#solarPowerGraphElement", cardId: 'solar-power-graph', label: 'Power output (W)' },
-                "solarEnergy": { name: "solarEnergy", type: 'bar', element: "#solarEnergyGraphElement", cardId: 'solar-energy-graph', label: 'Energy produced (Wh)' }
-                };
-  for (let graphName in graphs) {
-    graphs[graphName].options = JSON.parse(JSON.stringify(makeDefaultGraphOptions()));
+  let solarGraphs = new Map([ ["solarPower", new Graph('line', "solar-power", 'Power output (W)')],
+                              ["solarEnergy", new Graph('bar', "solar-energy", 'Energy produced (Wh)')]
+                            ]);
+  let meterGraphs = new Map([['elecReceived', new Graph('bar', 'meter-elec-received', 'Energy from supplier (kWh)')]
+                            ]);
+
+  let graphs = new Map();
+
+  for (let [name, g] of solarGraphs.entries()) {
+    graphs.set(name, g);
+  }
+  for (let [name, g] of meterGraphs.entries()) {
+    graphs.set(name, g);
   }
 
   $(document).ready(function () {
-    for (let graphName in graphs) {
-      let graph = graphs[graphName];
-      let canvas = $(graph.element).get(0).getContext('2d');
+    for (let [graphName, graph] of graphs) {
+      let canvas = $(`#${graph.getElement()}`).get(0).getContext('2d');
 
       graph.chart = new Chart(canvas, {
         type: graph.type,
@@ -127,15 +124,17 @@
 
     $('#querytime').daterangepicker(makeDefaultTimePickerOptions());
 
-    // Initial fetch
-    const deltaSeconds_str = sessionStorage.getItem('energyPreviousDeltaSeconds');
+    // Initial meter fetch
+
+    // Initial solar fetch
+    const solarDeltaSeconds_str = sessionStorage.getItem('solarPreviousDeltaSeconds');
 
     let picker = $('#querytime').data('daterangepicker');
     let startDate = picker.startDate;
     let endDate = picker.endDate;
-    if (deltaSeconds_str != null)
+    if (solarDeltaSeconds_str != null)
     {
-      startDate = moment().subtract(deltaSeconds_str, 'seconds');
+      startDate = moment().subtract(solarDeltaSeconds_str, 'seconds');
       endDate = moment();
     }
     fetchAndUpdate(startDate, endDate, picker.locale.format);
@@ -146,21 +145,20 @@
   });
 
   function fetchAndUpdate(startDate, endDate, dateFormat) {
-    sessionStorage.setItem('energyPreviousDeltaSeconds', endDate.diff(startDate, 'seconds'));
+    sessionStorage.setItem('solarPreviousDeltaSeconds', endDate.diff(startDate, 'seconds'));
 
     $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + deltaString(startDate, endDate) + ")");
-    for (let graphName in graphs) {
-      $('#' + graphs[graphName].cardId + ' .overlay').show();
+    for (let [graphName, graph] in solarGraphs) {
+      $(`#${graph.getCardId()} .overlay`).show();
     }
 
     let startUTC = Math.trunc(startDate.valueOf() / 1000);
     let endUTC = Math.trunc(endDate.valueOf() / 1000);
 
-    $.getJSON("api_db.php?getGraphData&energy&from=" + startUTC + "&to=" + endUTC,
+    $.getJSON("api_db.php?getGraphData&solar&from=" + startUTC + "&to=" + endUTC,
       function (data) {
 
-        for (let graphName in graphs) {
-          let graph = graphs[graphName];
+        for (let [graphName, graph] of solarGraphs) {
           graph.chart.data.labels = [];
           graph.chart.data.datasets[0] = {
             label:  graph.label,
@@ -171,31 +169,30 @@
           };
         }
 
-        graphs['solarEnergy'].chart.data.datasets[0].barThickness = 'flex';
+        solarGraphs.get('solarEnergy').chart.data.datasets[0].barThickness = 'flex';
 
         if (data.length > 0) {
           let previousLifetime_wh = data[0].lifetime_wh;
           $.each(data,
             function(index, entry) {
-              graphs['solarPower'].chart.data.datasets[0].data.push(entry.current_w);
-              graphs['solarPower'].chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+              solarGraphs.get('solarPower').chart.data.datasets[0].data.push(entry.current_w);
+              solarGraphs.get('solarPower').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
 
               let deltaEnergy = entry.lifetime_wh - previousLifetime_wh;
               previousLifetime_wh = entry.lifetime_wh;
               if (deltaEnergy != 0 || entry.current_w == 0)
               {
-                graphs['solarEnergy'].chart.data.datasets[0].data.push(deltaEnergy);
-                graphs['solarEnergy'].chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                solarGraphs.get('solarEnergy').chart.data.datasets[0].data.push(deltaEnergy);
+                solarGraphs.get('solarEnergy').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
               }
               else { console.log('Skipping it...'); }
             }
           );
         }
 
-        for (let graphName in graphs) {
-          let graph = graphs[graphName];
+        for (let [graphName, graph] of solarGraphs) {
           graph.chart.update();
-          $('#' + graph.cardId + ' .overlay').hide();
+          $(`#${graph.getCardId()} .overlay`).hide();
         }
       } // Json handler
     );

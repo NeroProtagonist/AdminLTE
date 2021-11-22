@@ -241,7 +241,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['weather'])) {
     return;
 }
 
-if (isset($_GET['getGraphData']) && isset($_GET['energy'])) {
+if (isset($_GET['getGraphData']) && isset($_GET['solar'])) {
     $timeLimit = getSQLTimeLimit();
 
     $logConnection->select_db("solarLogs");
