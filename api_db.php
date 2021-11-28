@@ -123,6 +123,11 @@ function sqlToTimestamp($dateTime)
     return $time->format('U');
 }
 
+function addDebugData($dataArray, $name, $value)
+{
+    $dataArray['debug'][$name] = $value;
+}
+
 if (isset($_GET['getGraphData2']) && isset($_GET['weather'])) {
 
     $timeLimit = getSQLTimeLimit();
@@ -201,10 +206,6 @@ if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
     }
     $res->free_result();
 
-    //$returnedData['debug']['delta_s'] = $delta_s;
-    //$returnedData['debug']['interval_s'] = $interval_s;
-    //$returnedData['debug']['sql'] = $sql;
-
     header('Content-type: application/json');
     echo json_encode($returnedData);
     return;
@@ -257,6 +258,52 @@ if (isset($_GET['getGraphData']) && isset($_GET['solar'])) {
 
     $returnedData = array();
     $returnedData = $res->fetch_all(MYSQLI_ASSOC);
+    $res->free_result();
+
+    foreach ($returnedData as &$data) {
+        $data['dateTime'] = sqlToTimestamp($data['dateTime']);
+    }
+
+    header('Content-type: application/json');
+    echo json_encode($returnedData);
+    return;
+}
+
+if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
+
+    if (!isset($_GET['from']) || !isset($_GET['to']) || !isset($_GET['period_s'])) {
+        die('Needs period');
+    }
+
+    // TODO: Perhaps SQL can sum up energy for time period
+
+    $timeLimit = getSQLTimeLimit();
+
+    $logConnection->select_db('meterLogs');
+    $sql = "SELECT dateTime, stat, value FROM log WHERE";
+    if ($timeLimit != '') {
+        $sql .= " $timeLimit AND";
+    }
+
+    list($fromTime, $toTime) = getQueryTimespan();
+    $interval_s = $_GET['period_s'];
+    $sql .= " TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 % $interval_s = 0";
+
+    $res = $logConnection->query($sql);
+    if (!$res) {
+        die("Table query failed: (" . $logConnection->errno . ") " . $logConnection->error);
+    }
+
+    //$returnedData = array();
+    $returnedData = $res->fetch_all(MYSQLI_ASSOC);
+
+    /*while ($row = $res->fetch_array(MYSQLI_NUM)) {
+        $timestamp_s = sqlToTimestamp($row[0]);
+        $stat = $row[1];
+        $value = $row[2];
+        // { stat => timestamp => value }
+        $returnedData[$stat][$timestamp_s] = $value;
+    }*/
     $res->free_result();
 
     foreach ($returnedData as &$data) {
