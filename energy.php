@@ -23,10 +23,10 @@
             </h3>
           </div> <!-- .card-header -->
           <div class="card-body">
-            <select class="form-control">
-              <option>15 minutes</option>
-              <option>Hourly</option>
-              <option>Daily</option>
+            <select id="meterPeriod", class="form-control">
+              <option value="meter_15m">15 minutes</option>
+              <option value='meter_1h''>Hourly</option>
+              <option value='meter_24h'>Daily</option>
             </select>
           </div> <!-- .card-body -->
         </div> <!-- .card -->
@@ -35,6 +35,7 @@
 
     <?php
       newChart("meter-elec-received", "Elec Received");
+      newChart("meter-power-received", "Power Received");
     ?>
   </div> <!-- .container-fluid -->
 </section>
@@ -96,7 +97,8 @@
   let solarGraphs = new Map([ ["solarPower", new Graph('line', "solar-power", 'Power output (W)')],
                               ["solarEnergy", new Graph('bar', "solar-energy", 'Energy produced (Wh)')]
                             ]);
-  let meterGraphs = new Map([['elecReceived', new Graph('bar', 'meter-elec-received', 'Energy from supplier (kWh)')]
+  let meterGraphs = new Map([ ['elecReceived', new Graph('bar', 'meter-elec-received', 'Energy from supplier (kWh)')],
+                              ['powerReceived', new Graph('line', 'meter-power-received', 'Power from supplier (kW)')]
                             ]);
 
   let graphs = new Map();
@@ -108,8 +110,20 @@
     graphs.set(name, g);
   }
 
+  function getPeriod(str) {
+    let [period_s, startDate] = function() {
+      switch (str) {
+        case 'meter_15m': return [ 15 * 60, moment().subtract(6, 'hours') ];
+        case 'meter_1h': return [ 60 * 60, moment().startOf('day') ];
+        case 'meter_24h': return [ 24 * 60 * 60, moment().startOf('month') ];
+      }
+      return  [ 0, moment() ];
+    }();
+    return [ period_s, startDate, moment() ];
+  }
+
   $(document).ready(function () {
-    for (let [graphName, graph] of graphs) {
+    for (let [, graph] of graphs) {
       let canvas = $(`#${graph.getElement()}`).get(0).getContext('2d');
 
       graph.chart = new Chart(canvas, {
@@ -125,6 +139,7 @@
     $('#querytime').daterangepicker(makeDefaultTimePickerOptions());
 
     // Initial meter fetch
+    fetchAndUpdateMeter()
 
     // Initial solar fetch
     const solarDeltaSeconds_str = sessionStorage.getItem('solarPreviousDeltaSeconds');
@@ -144,11 +159,79 @@
     fetchAndUpdate(picker.startDate, picker.endDate, picker.locale.format);
   });
 
+  $('#meterPeriod').change(function() {
+    fetchAndUpdateMeter();
+  });
+
+  function resetGraph(graph) {
+    graph.chart.data.labels = [];
+    graph.chart.data.datasets[0] = {
+      label: graph.label,
+      backgroundColor: makeDefaultGraphColours().red,
+      borderColor: makeDefaultGraphColours().red,
+      fill: false,
+      data: []
+    };
+  }
+
+  function fetchAndUpdateMeter() {
+    let v = $('#meterPeriod option:selected').val();
+    let [period_s, startDate, endDate] = getPeriod(v);
+
+    for (let [, graph] in meterGraphs) {
+      $(`#${graph.getCardId()} .overlay`).show();
+    }
+
+    let startUTC = Math.trunc(startDate.valueOf() / 1000);
+    let endUTC = Math.trunc(endDate.valueOf() / 1000);
+
+    $.getJSON(`api_db.php?getGraphData&meter&from=${startUTC}&to=${endUTC}&period_s=${period_s}`,
+      function(data) {
+        for (let [, graph] of meterGraphs) {
+          resetGraph(graph);
+        }
+
+        // Find first elec value
+        let prevElecReceived = 0;
+        for (let entry of data) {
+          if (entry.stat == 4) {
+            prevElecReceived = entry.value;
+            break;
+          }
+        }
+
+        $.each(data,
+          function(index, entry) {
+            switch (Number(entry.stat)) {
+              case 4:
+              {
+                let delta = entry.value - prevElecReceived;
+                prevElecReceived = entry.value;
+                meterGraphs.get('elecReceived').chart.data.datasets[0].data.push(delta);
+                meterGraphs.get('elecReceived').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                break;
+              }
+              case 9:
+              {
+                meterGraphs.get('powerReceived').chart.data.datasets[0].data.push(Number(entry.value));
+                meterGraphs.get('powerReceived').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                break;
+              }
+            }
+          });
+
+        for (let [, graph] of meterGraphs) {
+          graph.chart.update();
+          $(`#${graph.getCardId()} .overlay`).hide();
+        }
+      });
+  }
+
   function fetchAndUpdate(startDate, endDate, dateFormat) {
     sessionStorage.setItem('solarPreviousDeltaSeconds', endDate.diff(startDate, 'seconds'));
 
     $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + deltaString(startDate, endDate) + ")");
-    for (let [graphName, graph] in solarGraphs) {
+    for (let [, graph] in solarGraphs) {
       $(`#${graph.getCardId()} .overlay`).show();
     }
 
@@ -158,15 +241,8 @@
     $.getJSON("api_db.php?getGraphData&solar&from=" + startUTC + "&to=" + endUTC,
       function (data) {
 
-        for (let [graphName, graph] of solarGraphs) {
-          graph.chart.data.labels = [];
-          graph.chart.data.datasets[0] = {
-            label:  graph.label,
-            backgroundColor: makeDefaultGraphColours().red,
-            borderColor: makeDefaultGraphColours().red,
-            fill: false,
-            data: []
-          };
+        for (let [, graph] of solarGraphs) {
+          resetGraph(graph);
         }
 
         solarGraphs.get('solarEnergy').chart.data.datasets[0].barThickness = 'flex';
@@ -190,7 +266,7 @@
           );
         }
 
-        for (let [graphName, graph] of solarGraphs) {
+        for (let [, graph] of solarGraphs) {
           graph.chart.update();
           $(`#${graph.getCardId()} .overlay`).hide();
         }
