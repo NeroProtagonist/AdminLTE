@@ -123,7 +123,7 @@ function sqlToTimestamp($dateTime)
     return $time->format('U');
 }
 
-function addDebugData($dataArray, $name, $value)
+function addDebugData(&$dataArray, $name, $value)
 {
     $dataArray['debug'][$name] = $value;
 }
@@ -287,7 +287,8 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
 
     list($fromTime, $toTime) = getQueryTimespan();
     $interval_s = $_GET['period_s'];
-    $sql .= " TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 % $interval_s = 0";
+    $samplingPeriod = 30;
+    $sql .= " TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 % $interval_s <= $samplingPeriod ORDER BY stat, dateTime";
 
     $res = $logConnection->query($sql);
     if (!$res) {
@@ -310,9 +311,14 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
         $data['dateTime'] = sqlToTimestamp($data['dateTime']);
     }
 
+    //addDebugData($returnedData, 'query', $sql);
+
     header('Content-type: application/json');
     echo json_encode($returnedData);
     return;
 }
+
+// Whoa - Calculate average power over 15 second window for last 10 minutes of data
+// SELECT *, AVG(value) OVER (ORDER BY unix_timestamp(dateTime) RANGE BETWEEN 15 PRECEDING AND CURRENT ROW ) FROM (SELECT *, UNIX_TIMESTAMP(dateTime) FROM log WHERE dateTime > UTC_TIMESTAMP() - INTERVAL 10 MINUTE AND stat = 9) recent
 
 die("no command?");

@@ -82,7 +82,7 @@
 
 <!-- ChartJS -->
 <script src="plugins/moment/moment.min.js"></script>
-<script src="plugins/chart.js/Chart.min.js"></script>
+<script src="plugins/chart.js/Chart.js"></script>
 <!--<script src="plugins/chart.js/Chart.js"></script>-->
 <script src="plugins/daterangepicker/daterangepicker.js"></script>
 <!-- page script -->
@@ -113,7 +113,7 @@
   function getPeriod(str) {
     let [period_s, startDate] = function() {
       switch (str) {
-        case 'meter_15m': return [ 15 * 60, moment().subtract(6, 'hours') ];
+        case 'meter_15m': return [ 15 * 60, moment().subtract(6, 'hours').startOf('hour') ];
         case 'meter_1h': return [ 60 * 60, moment().startOf('day') ];
         case 'meter_24h': return [ 24 * 60 * 60, moment().startOf('month') ];
       }
@@ -192,23 +192,37 @@
         }
 
         // Find first elec value
-        let prevElecReceived = 0;
-        for (let entry of data) {
-          if (entry.stat == 4) {
-            prevElecReceived = entry.value;
-            break;
-          }
-        }
+        let prevElecReceived = [ 0, 0 ];
+        let prevDateTime = [ 0, 0 ];
+
+        let elecReceivedLabels = [];
 
         $.each(data,
           function(index, entry) {
             switch (Number(entry.stat)) {
               case 4:
+              case 5:
               {
-                let delta = entry.value - prevElecReceived;
-                prevElecReceived = entry.value;
-                meterGraphs.get('elecReceived').chart.data.datasets[0].data.push(delta);
-                meterGraphs.get('elecReceived').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                let index = Number(entry.stat) - 4;
+                let deltaV = entry.value - prevElecReceived[index];
+                prevElecReceived[index] = entry.value;
+                let deltaT = Number(entry.dateTime) - prevDateTime[index];
+                prevDateTime[index] = Number(entry.dateTime);
+
+                elecReceivedLabels.push(new Date(Number(entry.dateTime * 1000)));
+
+                if (deltaV == entry.value) {
+                  // Ignore first value
+                  break;
+                }
+
+                if (deltaV != 0 && deltaT > period_s * 0.9) {
+                  meterGraphs.get('elecReceived').chart.data.datasets[0].data.push(deltaV);
+                  //let tVal = Number(entry.dateTime) - deltaT / 2;
+                  let tVal = Number(entry.dateTime);
+                  meterGraphs.get('elecReceived').chart.data.labels.push(new Date(tVal * 1000));
+                }
+
                 break;
               }
               case 9:
@@ -219,6 +233,16 @@
               }
             }
           });
+
+        for (let [, graph] of meterGraphs) {
+          graph.chart.options.scales.xAxes[0].time.unit = 'minute';
+          graph.chart.options.scales.xAxes[0].time.stepSize = period_s / 60;
+        }
+
+        graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.min = startDate;
+        graphs.get('elecReceived').chart.options.scales.xAxes[0].gridLines.offsetGridLines = true;
+        graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.source = 'labels';
+        //graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.labels = elecReceivedLabels;
 
         for (let [, graph] of meterGraphs) {
           graph.chart.update();
