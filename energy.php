@@ -218,8 +218,7 @@
 
                 if (deltaV != 0 && deltaT > period_s * 0.9) {
                   meterGraphs.get('elecReceived').chart.data.datasets[0].data.push(deltaV);
-                  //let tVal = Number(entry.dateTime) - deltaT / 2;
-                  let tVal = Number(entry.dateTime);
+                  let tVal = Number(entry.dateTime) - deltaT / 2;
                   meterGraphs.get('elecReceived').chart.data.labels.push(new Date(tVal * 1000));
                 }
 
@@ -240,9 +239,7 @@
         }
 
         graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.min = startDate;
-        graphs.get('elecReceived').chart.options.scales.xAxes[0].gridLines.offsetGridLines = true;
-        graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.source = 'labels';
-        //graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.labels = elecReceivedLabels;
+        graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.max = endDate;
 
         for (let [, graph] of meterGraphs) {
           graph.chart.update();
