@@ -187,7 +187,7 @@ if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
     list($fromTime, $toTime) = getQueryTimespan();
     $delta_s = abs($fromTime->getTimestamp() - $toTime->getTimestamp());
     $interval_s = $delta_s / 200;
-    $interval_s = (int)((int)($interval_s) / 5) * 5;
+    $interval_s = max((int)((int)($interval_s) / 5) * 5, 2);
     $sql .= " TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 % $interval_s = 0";
 
     $res = $logConnection->query($sql);
