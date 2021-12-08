@@ -192,25 +192,22 @@
         }
 
         // Find first elec value
-        let prevElecReceived = [ 0, 0 ];
-        let prevDateTime = [ 0, 0 ];
-
-        let elecReceivedLabels = [];
+        let prevValue = [];
+        let prevDateTime = [];
 
         $.each(data,
           function(index, entry) {
+
+            let stat = Number(entry.stat);
+            let deltaV = entry.value - prevValue[stat];
+            prevValue[stat] = entry.value;
+            let deltaT = Number(entry.dateTime) - prevDateTime[stat];
+            prevDateTime[stat] = Number(entry.dateTime);
+
             switch (Number(entry.stat)) {
               case 4:
               case 5:
               {
-                let index = Number(entry.stat) - 4;
-                let deltaV = entry.value - prevElecReceived[index];
-                prevElecReceived[index] = entry.value;
-                let deltaT = Number(entry.dateTime) - prevDateTime[index];
-                prevDateTime[index] = Number(entry.dateTime);
-
-                elecReceivedLabels.push(new Date(Number(entry.dateTime * 1000)));
-
                 if (deltaV == entry.value) {
                   // Ignore first value
                   break;
@@ -226,8 +223,11 @@
               }
               case 9:
               {
-                meterGraphs.get('powerReceived').chart.data.datasets[0].data.push(Number(entry.value));
-                meterGraphs.get('powerReceived').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                if (deltaT > period_s * 0.95) {
+                  // TODO: Could choose max of this and current
+                  meterGraphs.get('powerReceived').chart.data.datasets[0].data.push(Number(entry.value));
+                  meterGraphs.get('powerReceived').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                }
                 break;
               }
             }
