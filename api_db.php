@@ -55,9 +55,34 @@ if (isset($_GET['getLastValues']) && isset($_GET['weather'])) {
 }
 
 if (isset($_GET['getLastValues']) && isset($_GET['meter'])) {
+    $stats = array();
+    if (isset($_GET['stats'])) {
+        $split = preg_split('/,/', $_GET['stats']);
+        foreach ($split as $stat) {
+            if ($stat != '' && !is_numeric($stat)) {
+                die("{$stat} not numeric");
+            }
+            if ($stat != '') {
+                $stats[] = $stat;
+            }
+        }
+    }
+
     // Fetch all stats
     $logConnection->select_db("meterLogs");
-    $sql = "SELECT l.stat, l.dateTime, l.value, stats.unit, stats.description FROM log l INNER JOIN (SELECT MAX(recordId) rec FROM log GROUP BY stat) recent ON l.recordId = recent.rec INNER JOIN stats ON l.stat = stats.stat";
+    //$sql = "SELECT l.stat, l.dateTime, l.value, stats.unit, stats.description FROM log l INNER JOIN (SELECT MAX(recordId) rec FROM log GROUP BY stat) recent ON l.recordId = recent.rec INNER JOIN stats ON l.stat = stats.stat";
+    $where = "";
+    if (sizeof($stats) != 0) {
+        $where = "WHERE stat in ({$stats[0]}";
+        for ($n = 1; $n < sizeof($stats); $n++) {
+            $where .= ",{$stats[$n]}";
+        }
+        $where .= ")";
+    }
+    $sql = "SELECT l.stat, l.dateTime, l.value, stats.unit, stats.description FROM log l
+                    INNER JOIN (SELECT MAX(recent.recordId) recordId FROM
+                            (SELECT recordId, stat FROM log ${where} ORDER BY recordId DESC LIMIT 1000) recent GROUP BY stat) recent ON l.recordId = recent.recordId
+                    INNER JOIN stats ON l.stat = stats.stat";
     $res = $logConnection->query($sql);
 
     $data = array();
