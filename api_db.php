@@ -43,6 +43,7 @@ if (isset($_GET['getLastValues']) && isset($_GET['weather'])) {
         $sql = "SELECT dateTime, value, type FROM log WHERE deviceId = {$deviceId} AND type = {$type} ORDER BY recordId DESC LIMIT 1";
         $res2 = $logConnection->query($sql);
         while ($row2 = $res2->fetch_assoc()) {
+            $row2['dateTime'] = sqlToTimestamp($row2['dateTime']);
             $data[] = $row2;
         }
         $res2->free_result();

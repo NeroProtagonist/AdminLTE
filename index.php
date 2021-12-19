@@ -2,13 +2,15 @@
   require "header.php"
 ?>
 
+<script src="plugins/moment/moment.min.js"></script>
+
 <div class="content-header">
   <div class="container-fluid">
     <div class="row mb-2">
-      <div class="col-sm-6">
+      <div class="col-sm">
         <h1 class="m-0 text-dark">Overview</h1>
       </div>
-      <div class="col-sm-6">
+      <div class="col-sm">
         <div class="float-sm-right">
           <input type="checkbox" name="refreshStats" id="refreshStatsToggle">
           <label for="refreshStatsToggle">Refresh</label>
@@ -36,7 +38,7 @@
   <div class="card" class="container-fluid">
     <div class="card-header">
       <h3 class="card-title">
-        Meter
+        Energy
       </h3>
     </div>
     <div class="card-body">
@@ -44,16 +46,6 @@
         <!-- Insertion place for energy meter data -->
 
       </div> <!-- .container-fluid -->
-    </div>
-  </div>
-
-  <div class="card" class="container-fluid">
-    <div class="card-header">
-      <h3 class="card-title">
-        Solar
-      </h3>
-    </div>
-    <div class="card-body">
       <div id="solarInsert">
         <!-- Insertion place for solar data -->
 
@@ -84,8 +76,8 @@
     return { id: `meter_${value['stat']}`, text : `${value['value']} ${value['unit']}` };
   }
 
-  let energyStatsLayout = [ [ 9, 10 ], [ 4, 5 ], [ 33 ], [ 6, 7 ] ];
-  let energyStatsRowDesc = [ 'Power', 'Elec received', 'Gas', 'Elec sent' ];
+  let energyStatsLayout = [ [ 9, 10 ] ];
+  let energyStatsRowDesc = [ 'Power' ];
 
   function initStats() {
     $.getJSON("api_db.php?getDeviceIds",
@@ -106,8 +98,18 @@
               $.getJSON("api_db.php?getLastValues&weather&deviceId=" + deviceId,
                 function(values) {
                   // Device name
+                  let sampleTime = moment(new Date(Number(values[0].dateTime * 1000)));
                   let txt = `
-                    <h5 class="mb-2">${desc['friendlyName']}</h5>
+                    <div class="row">
+                      <div class="col-sm">
+                        <h5 class="mb-2">${desc['friendlyName']}</h5>
+                      </div>
+                      <div class="col-sm">
+                        <div class="float-sm-right">
+                          <p class="mb-2">${sampleTime.format('ddd DD/MM/YY HH:mm:ss')}</p>
+                        </div>
+                      </div>
+                    </div>
                     <div class="row">`;
                   for (let value of values) {
                     let displaySet = getWeatherDisplaySet(deviceId, value);
@@ -136,12 +138,22 @@
       }); // getDeviceIds
 
     $('#meterInsert').empty()
-    $.getJSON("api_db.php?getLastValues&meter",
+    $.getJSON("api_db.php?getLastValues&meter&stats=9,10",
       function(stats) {
         let row = 0;
         for (let statRow in energyStatsLayout) {
+          let sampleTime = moment(stats[energyStatsLayout[statRow][0]].dateTime + ' +00:00', 'YYYY-MM-DD HH:mm:ss ZZ');
           let txt = `
-            <h5 class="mb-2">${energyStatsRowDesc[row]}</h5>
+            <div class="row">
+              <div class="col-sm">
+                <h5 class="mb-2">${energyStatsRowDesc[row]}</h5>
+              </div>
+              <div class="col-sm">
+                <div class="float-sm-right">
+                  <p class="mb-2">${sampleTime.format('ddd DD/MM/YY HH:mm:ss')}</p>
+                </div>
+              </div>
+            </div>
             <div class="row">`;
           for (let stat of energyStatsLayout[statRow]) {
             let displaySet = getMeterDisplaySet(stats[stat]);
