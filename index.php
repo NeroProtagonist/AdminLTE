@@ -98,7 +98,7 @@
               $.getJSON("api_db.php?getLastValues&weather&deviceId=" + deviceId,
                 function(values) {
                   // Device name
-                  let sampleTime = moment(new Date(Number(values[0].dateTime * 1000)));
+                  let sampleTime = moment(new Date(Number(values[0].ts * 1000)));
                   let txt = `
                     <div class="row">
                       <div class="col-sm">

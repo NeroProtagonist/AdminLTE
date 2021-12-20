@@ -40,10 +40,9 @@ if (isset($_GET['getLastValues']) && isset($_GET['weather'])) {
     $dataTypes = explode(',', $res->fetch_array()[0]);
     foreach($dataTypes as $type)
     {
-        $sql = "SELECT dateTime, value, type FROM log WHERE deviceId = {$deviceId} AND type = {$type} ORDER BY recordId DESC LIMIT 1";
+        $sql = "SELECT ts, type, value FROM log WHERE deviceId = {$deviceId} AND type = {$type} ORDER BY ts DESC LIMIT 1";
         $res2 = $logConnection->query($sql);
         while ($row2 = $res2->fetch_assoc()) {
-            $row2['dateTime'] = sqlToTimestamp($row2['dateTime']);
             $data[] = $row2;
         }
         $res2->free_result();
@@ -123,7 +122,7 @@ function getQueryTimespan()
     return array($fromTime, $toTime);
 }
 
-function getSQLTimeLimit()
+function getSQLDateTimeLimit()
 {
     // Time limit
     $limit = '';
@@ -143,7 +142,27 @@ function getSQLTimeLimit()
     return $limit;
 }
 
-function sqlToTimestamp($dateTime)
+function getSQLTimestampLimit()
+{
+    // Time limit
+    $limit = '';
+
+    list($fromTime, $toTime) = getQueryTimespan();
+
+    if (isset($_GET['from'])) {
+        $limit .= " AND ts >= " . $fromTime->format('U');
+    }
+    if (isset($_GET["to"])) {
+        $limit .= " AND ts <= " . $toTime->format('U');
+    }
+
+    // Remove first AND
+    $limit = preg_replace('/^ AND/', '', $limit);
+
+    return $limit;
+}
+
+function sqlDateTimeToTimestamp($dateTime)
 {
     $time = DateTime::createFromFormat('Y-m-d H:i:s', $dateTime, new DateTimeZone("UTC"));
     return $time->format('U');
@@ -156,7 +175,7 @@ function addDebugData(&$dataArray, $name, $value)
 
 if (isset($_GET['getGraphData2']) && isset($_GET['weather'])) {
 
-    $timeLimit = getSQLTimeLimit();
+    $timeLimit = getSQLDateTimeLimit();
 
     $returnedData = array();
 
@@ -181,7 +200,7 @@ if (isset($_GET['getGraphData2']) && isset($_GET['weather'])) {
 
         $dataRes = $logConnection->query($dataSql);
         while ($sampleRow = $dataRes->fetch_array(MYSQLI_NUM)) {
-            $timestamp_s = sqlToTimestamp($sampleRow[0]);
+            $timestamp_s = sqlDateTimeToTimestamp($sampleRow[0]);
             $value = $sampleRow[1];
             // { deviceId => type => timestamp => value }
             $returnedData[$deviceId][$type][$timestamp_s] = $value;
@@ -202,10 +221,10 @@ if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
         die('Needs from and to');
     }
 
-    $timeLimit = getSQLTimeLimit();
+    $timeLimit = getSQLTimestampLimit();
 
     $logConnection->select_db("sensorLogs");
-    $sql = "SELECT dateTime, deviceId, value, type FROM log WHERE";
+    $sql = "SELECT ts, deviceId, type, value FROM log WHERE";
     if ($timeLimit != '') {
         $sql .= " $timeLimit AND";
     }
@@ -214,7 +233,7 @@ if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
     $delta_s = abs($fromTime->getTimestamp() - $toTime->getTimestamp());
     $interval_s = $delta_s / 200;
     $interval_s = max((int)((int)($interval_s) / 5) * 5, 2);
-    $sql .= " TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 % $interval_s = 0";
+    $sql .= " TRUNCATE(ts / 10, 0) * 10 % $interval_s = 0";
 
     $res = $logConnection->query($sql);
     if (!$res) {
@@ -223,10 +242,10 @@ if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
 
     $returnedData = array();
     while ($row = $res->fetch_array(MYSQLI_NUM)) {
-        $timestamp_s = sqlToTimestamp($row[0]);
+        $timestamp_s = $row[0];
         $deviceId = $row[1];
-        $value = $row[2];
-        $type = $row[3];
+        $type = $row[2];
+        $value = $row[3];
         // { deviceId => type => timestamp => value }
         $returnedData[$deviceId][$type][$timestamp_s] = $value;
     }
@@ -239,7 +258,7 @@ if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
 
 if (isset($_GET['getGraphData']) && isset($_GET['weather'])) {
 
-    $timeLimit = getSQLTimeLimit();
+    $timeLimit = getSQLDateTimeLimit();
 
     $logConnection->select_db("sensorLogs");
     $sql = "SELECT dateTime, deviceId, value, type FROM log";
@@ -254,7 +273,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['weather'])) {
 
     $returnedData = array();
     while ($row = $res->fetch_array(MYSQLI_NUM)) {
-        $timestamp_s = sqlToTimestamp($row[0]);
+        $timestamp_s = sqlDateTimeToTimestamp($row[0]);
         $deviceId = $row[1];
         $value = $row[2];
         $type = $row[3];
@@ -269,7 +288,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['weather'])) {
 }
 
 if (isset($_GET['getGraphData']) && isset($_GET['solar'])) {
-    $timeLimit = getSQLTimeLimit();
+    $timeLimit = getSQLDateTimeLimit();
 
     $logConnection->select_db("solarLogs");
     $sql = "SELECT dateTime, current_w, lifetime_wh FROM log";
@@ -287,7 +306,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['solar'])) {
     $res->free_result();
 
     foreach ($returnedData as &$data) {
-        $data['dateTime'] = sqlToTimestamp($data['dateTime']);
+        $data['dateTime'] = sqlDateTimeToTimestamp($data['dateTime']);
     }
 
     header('Content-type: application/json');
@@ -303,7 +322,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
 
     // TODO: Perhaps SQL can sum up energy for time period
 
-    $timeLimit = getSQLTimeLimit();
+    $timeLimit = getSQLDateTimeLimit();
 
     $logConnection->select_db('meterLogs');
     $sql = "SELECT dateTime, stat, value FROM log WHERE";
@@ -334,7 +353,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
     $res->free_result();
 
     foreach ($returnedData as &$data) {
-        $data['dateTime'] = sqlToTimestamp($data['dateTime']);
+        $data['dateTime'] = sqlDateTimeToTimestamp($data['dateTime']);
     }
 
     //addDebugData($returnedData, 'query', $sql);
