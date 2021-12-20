@@ -36,6 +36,7 @@
     <?php
       newChart("meter-elec-received", "Elec Received");
       newChart("meter-power-received", "Power Received");
+      newChart("meter-gas-received", "Gas Received");
     ?>
   </div> <!-- .container-fluid -->
 </section>
@@ -98,7 +99,8 @@
                               ["solarEnergy", new Graph('bar', "solar-energy", 'Energy produced (Wh)')]
                             ]);
   let meterGraphs = new Map([ ['elecReceived', new Graph('bar', 'meter-elec-received', 'Energy from supplier (kWh)')],
-                              ['powerReceived', new Graph('line', 'meter-power-received', 'Power from supplier (kW)')]
+                              ['powerReceived', new Graph('line', 'meter-power-received', 'Power from supplier (kW)')],
+                              ['gasReceived', new Graph('bar', 'meter-gas-received', 'Gas from supplier (m^3)')]
                             ]);
 
   let graphs = new Map();
@@ -111,15 +113,24 @@
   }
 
   function getPeriod(str) {
-    let [period_s, startDate] = function() {
+    let [period_s, unit, startDate] = function() {
       switch (str) {
-        case 'meter_15m': return [ 15 * 60, moment().subtract(6, 'hours').startOf('hour') ];
-        case 'meter_1h': return [ 60 * 60, moment().startOf('day') ];
-        case 'meter_24h': return [ 24 * 60 * 60, moment().startOf('month') ];
+        case 'meter_15m': return [ 15 * 60, 'minute', moment().subtract(6, 'hours').startOf('hour') ];
+        case 'meter_1h': return [ 60 * 60, 'hour', moment().startOf('day') ];
+        case 'meter_24h': return [ 24 * 60 * 60, 'day', moment().startOf('month') ];
       }
       return  [ 0, moment() ];
     }();
-    return [ period_s, startDate, moment() ];
+    return [ period_s, unit, startDate, moment() ];
+  }
+
+  function getStepSizeDenom(unit) {
+    switch (unit) {
+      case 'minute': return 60;
+      case 'hour': return 60 * 60;
+      case 'day': return 60 * 60 * 24;
+    }
+    return null;
   }
 
   $(document).ready(function () {
@@ -176,7 +187,7 @@
 
   function fetchAndUpdateMeter() {
     let v = $('#meterPeriod option:selected').val();
-    let [period_s, startDate, endDate] = getPeriod(v);
+    let [period_s, unit, startDate, endDate] = getPeriod(v);
 
     for (let [, graph] in meterGraphs) {
       $(`#${graph.getCardId()} .overlay`).show();
@@ -195,6 +206,12 @@
         let prevValue = [];
         let prevDateTime = [];
 
+        const statToChart = { 4: meterGraphs.get('elecReceived').chart,
+                              5: meterGraphs.get('elecReceived').chart,
+                              9: meterGraphs.get('powerReceived').chart,
+                              33: meterGraphs.get('gasReceived').chart
+                            };
+
         $.each(data,
           function(index, entry) {
 
@@ -204,9 +221,15 @@
             let deltaT = Number(entry.dateTime) - prevDateTime[stat];
             prevDateTime[stat] = Number(entry.dateTime);
 
+            let chart = statToChart[stat];
+            if (chart == null) {
+              return;
+            }
+
             switch (Number(entry.stat)) {
               case 4:
               case 5:
+              case 33:
               {
                 if (deltaV == entry.value) {
                   // Ignore first value
@@ -214,9 +237,9 @@
                 }
 
                 if (deltaV != 0 && deltaT > period_s * 0.9) {
-                  meterGraphs.get('elecReceived').chart.data.datasets[0].data.push(deltaV);
+                  chart.data.datasets[0].data.push(deltaV);
                   let tVal = Number(entry.dateTime) - deltaT / 2;
-                  meterGraphs.get('elecReceived').chart.data.labels.push(new Date(tVal * 1000));
+                  chart.data.labels.push(new Date(tVal * 1000));
                 }
 
                 break;
@@ -225,8 +248,8 @@
               {
                 if (deltaT > period_s * 0.95) {
                   // TODO: Could choose max of this and current
-                  meterGraphs.get('powerReceived').chart.data.datasets[0].data.push(Number(entry.value));
-                  meterGraphs.get('powerReceived').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                  chart.data.datasets[0].data.push(Number(entry.value));
+                  chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
                 }
                 break;
               }
@@ -234,12 +257,14 @@
           });
 
         for (let [, graph] of meterGraphs) {
-          graph.chart.options.scales.xAxes[0].time.unit = 'minute';
-          graph.chart.options.scales.xAxes[0].time.stepSize = period_s / 60;
+          graph.chart.options.scales.xAxes[0].time.unit = unit;
+          graph.chart.options.scales.xAxes[0].time.stepSize = period_s / getStepSizeDenom(unit);
         }
 
-        graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.min = startDate;
-        graphs.get('elecReceived').chart.options.scales.xAxes[0].ticks.max = endDate;
+        for (let g of [4, 5, 33]) {
+          statToChart[g].options.scales.xAxes[0].ticks.min = startDate;
+          statToChart[g].options.scales.xAxes[0].ticks.max = endDate;
+        }
 
         for (let [, graph] of meterGraphs) {
           graph.chart.update();
