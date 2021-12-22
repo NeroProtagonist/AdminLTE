@@ -298,14 +298,14 @@
           $.each(data,
             function(index, entry) {
               solarGraphs.get('solarPower').chart.data.datasets[0].data.push(entry.current_w);
-              solarGraphs.get('solarPower').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+              solarGraphs.get('solarPower').chart.data.labels.push(new Date(Number(entry.ts * 1000)));
 
               let deltaEnergy = entry.lifetime_wh - previousLifetime_wh;
               previousLifetime_wh = entry.lifetime_wh;
               if (deltaEnergy != 0 || entry.current_w == 0)
               {
                 solarGraphs.get('solarEnergy').chart.data.datasets[0].data.push(deltaEnergy);
-                solarGraphs.get('solarEnergy').chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                solarGraphs.get('solarEnergy').chart.data.labels.push(new Date(Number(entry.ts * 1000)));
               }
               else { console.log('Skipping it...'); }
             }

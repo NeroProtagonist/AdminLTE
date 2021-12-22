@@ -288,10 +288,10 @@ if (isset($_GET['getGraphData']) && isset($_GET['weather'])) {
 }
 
 if (isset($_GET['getGraphData']) && isset($_GET['solar'])) {
-    $timeLimit = getSQLDateTimeLimit();
+    $timeLimit = getSQLTimestampLimit();
 
     $logConnection->select_db("solarLogs");
-    $sql = "SELECT dateTime, current_w, lifetime_wh FROM log";
+    $sql = "SELECT ts, current_w, lifetime_wh FROM log";
     if ($timeLimit != '') {
         $sql .= " WHERE $timeLimit";
     }
@@ -304,10 +304,6 @@ if (isset($_GET['getGraphData']) && isset($_GET['solar'])) {
     $returnedData = array();
     $returnedData = $res->fetch_all(MYSQLI_ASSOC);
     $res->free_result();
-
-    foreach ($returnedData as &$data) {
-        $data['dateTime'] = sqlDateTimeToTimestamp($data['dateTime']);
-    }
 
     header('Content-type: application/json');
     echo json_encode($returnedData);
