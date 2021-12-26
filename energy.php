@@ -94,6 +94,7 @@
   import { makeDefaultGraphColours } from './graph.js';
   import { makeDefaultTimePickerOptions} from './graph.js';
   import { Graph } from './graph.js';
+  import { getSeconds } from './graph.js';
 
   let solarGraphs = new Map([ ["solarPower", new Graph('line', "solar-power", 'Power output (W)')],
                               ["solarEnergy", new Graph('bar', "solar-energy", 'Energy produced (Wh)')]
@@ -122,15 +123,6 @@
       return  [ 0, moment() ];
     }();
     return [ period_s, unit, startDate, moment() ];
-  }
-
-  function getStepSizeDenom(unit) {
-    switch (unit) {
-      case 'minute': return 60;
-      case 'hour': return 60 * 60;
-      case 'day': return 60 * 60 * 24;
-    }
-    return null;
   }
 
   $(document).ready(function () {

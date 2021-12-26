@@ -113,3 +113,13 @@ export function makeDefaultTimePickerOptions() {
     autoUpdateInput: false
   };
 }
+
+export function getSeconds(unit) {
+  switch (unit) {
+    case 'second': return 1;
+    case 'minute': return 60;
+    case 'hour': return 60 * 60;
+    case 'day': return 60 * 60 * 24;
+  }
+  return null;
+}

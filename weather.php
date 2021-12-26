@@ -64,6 +64,7 @@
   import { makeDefaultGraphColours } from './graph.js';
   import { makeDefaultTimePickerOptions} from './graph.js';
   import { Graph } from './graph.js';
+  import { getSeconds } from './graph.js';
 
   var graphs = { "temp": new Graph('line', 'temp', ''),
                  "humidity": new Graph('line', 'humidity', ''),
@@ -72,6 +73,22 @@
 
   graphs['humidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
   graphs['pressure'].options.scales.yAxes[0].ticks.beginAtZero = false;
+
+  function getPeriod(duration) {
+    if (duration <= 5 * 60) {
+      return [ 30, 'second' ];
+    }
+    if (duration <= 1 * 60 * 60) {
+      return [ 10 * 60, 'hour' ];
+    }
+    if (duration <= 6 * 60 * 60) {
+      return [ 30 * 60, 'hour' ];
+    }
+    if (duration <= 24 * 60 * 60) {
+      return [ 60 * 60, 'hour' ];
+    }
+    return [ 24 * 60 * 60, 'day' ];
+  }
 
   $(document).ready(function () {
     window.chartColors = makeDefaultGraphColours();
@@ -131,6 +148,8 @@
         for (let graphName in graphs) {
           graphs[graphName].chart.indexToDevice = [];
         }
+
+        let [period_s, unit] = getPeriod(endUTC - startUTC);
 
         $.each(data,
           function(deviceId, rec0) {
@@ -199,6 +218,8 @@
           }
           for (let graphName in graphs) {
             let graph = graphs[graphName];
+            graph.chart.options.scales.xAxes[0].time.unit = unit;
+            graph.chart.options.scales.xAxes[0].time.stepSize = period_s / getSeconds(unit);
             graph.chart.update();
             $(`#${graph.getCardId()} .overlay`).hide();
           }
