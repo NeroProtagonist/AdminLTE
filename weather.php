@@ -160,8 +160,8 @@
                 chart.data.datasets[deviceIndex] =
                 {
                   label: 'Device ' + deviceId,
-                  backgroundColor: Object.keys(window.chartColors)[deviceId],
-                  borderColor: Object.keys(window.chartColors)[deviceId],
+                  backgroundColor: Object.keys(window.chartColors)[deviceId - 1],
+                  borderColor: Object.keys(window.chartColors)[deviceId - 1],
                   fill: false,
                   data: []
                 };
@@ -170,7 +170,6 @@
                   function(timestamp_s, val) {
                     ++totalNum;
                     chart.data.datasets[deviceIndex].data.push({ x: new Date(Number(timestamp_s * 1000)), y: val});
-                    //chart.data.labels.push();
                   }
                 ); // $.each rec1
               }
