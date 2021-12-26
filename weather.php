@@ -53,8 +53,8 @@
 
 <!-- ChartJS -->
 <script src="plugins/moment/moment.min.js"></script>
-<script src="plugins/chart.js/Chart.min.js"></script>
-<!--<script src="plugins/chart.js/Chart.js"></script>-->
+<!-- <script src="plugins/chart.js/Chart.min.js"></script> -->
+<script src="plugins/chart.js/Chart.js"></script>
 <script src="plugins/daterangepicker/daterangepicker.js"></script>
 <!-- page script -->
 <script type="module">
@@ -124,13 +124,12 @@
       function (data) {
         let totalNum = 0;
 
-        let indexToDevice = [];
-        let nextIndex = 0;
-
         const typeToChart = { 0: graphs['temp'].chart, 1: graphs['humidity'].chart, 2: graphs['pressure'].chart };
 
+        let devices = new Set();
+
         for (let graphName in graphs) {
-          graphs[graphName].chart.data.labels = [];
+          graphs[graphName].chart.indexToDevice = [];
         }
 
         $.each(data,
@@ -141,11 +140,7 @@
               return;
             }
 
-            if (!indexToDevice.includes(deviceId)) {
-              indexToDevice[nextIndex] = deviceId;
-              nextIndex++;
-            }
-            let deviceIndex = indexToDevice.indexOf(deviceId);
+            devices.add(deviceId);
 
             $.each(rec0,
               function(type, rec1) {
@@ -157,11 +152,16 @@
 
                 let chart = typeToChart[type];
 
+                if (!chart.indexToDevice.includes(deviceId)) {
+                  chart.indexToDevice.push(deviceId);
+                }
+                let deviceIndex = chart.indexToDevice.indexOf(deviceId);
+
                 chart.data.datasets[deviceIndex] =
                 {
                   label: 'Device ' + deviceId,
-                  backgroundColor: Object.keys(window.chartColors)[deviceIndex],
-                  borderColor: Object.keys(window.chartColors)[deviceIndex],
+                  backgroundColor: Object.keys(window.chartColors)[deviceId],
+                  borderColor: Object.keys(window.chartColors)[deviceId],
                   fill: false,
                   data: []
                 };
@@ -169,8 +169,8 @@
                 $.each(rec1,
                   function(timestamp_s, val) {
                     ++totalNum;
-                    chart.data.datasets[deviceIndex].data.push(val);
-                    chart.data.labels.push(new Date(Number(timestamp_s * 1000)));
+                    chart.data.datasets[deviceIndex].data.push({ x: new Date(Number(timestamp_s * 1000)), y: val});
+                    //chart.data.labels.push();
                   }
                 ); // $.each rec1
               }
@@ -183,16 +183,16 @@
         let deviceRequests = [];
 
         // Get device names
-        for (let deviceId of indexToDevice) {
+        for (const deviceId of devices) {
           deviceRequests.push($.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId));
         }
 
         $.when.apply($, deviceRequests).done(function() {
           for (let resultIndex in arguments) {
             data = arguments[resultIndex][0];
-            let deviceIndex = indexToDevice.indexOf(data['deviceId']);
             for (let graphName in graphs) {
               let graph = graphs[graphName];
+              let deviceIndex = graph.chart.indexToDevice.indexOf(data['deviceId']);
               if (graph.chart.data.datasets[deviceIndex] !== undefined) {
                 graph.chart.data.datasets[deviceIndex].label = data['friendlyName'];
               }
