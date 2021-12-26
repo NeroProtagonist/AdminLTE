@@ -250,7 +250,7 @@
 
         for (let [, graph] of meterGraphs) {
           graph.chart.options.scales.xAxes[0].time.unit = unit;
-          graph.chart.options.scales.xAxes[0].time.stepSize = period_s / getStepSizeDenom(unit);
+          graph.chart.options.scales.xAxes[0].time.stepSize = period_s / getSeconds(unit);
         }
 
         for (let g of [4, 5, 33]) {
