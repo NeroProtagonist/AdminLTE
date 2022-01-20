@@ -329,23 +329,14 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
     list($fromTime, $toTime) = getQueryTimespan();
     $interval_s = $_GET['period_s'];
     $samplingPeriod = 30;
-    $sql .= " TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 % $interval_s <= $samplingPeriod ORDER BY stat, dateTime";
+    $sql .= " (TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 + $samplingPeriod) % $interval_s <= $samplingPeriod ORDER BY stat, dateTime";
 
     $res = $logConnection->query($sql);
     if (!$res) {
         die("Table query failed: (" . $logConnection->errno . ") " . $logConnection->error);
     }
 
-    //$returnedData = array();
     $returnedData = $res->fetch_all(MYSQLI_ASSOC);
-
-    /*while ($row = $res->fetch_array(MYSQLI_NUM)) {
-        $timestamp_s = sqlToTimestamp($row[0]);
-        $stat = $row[1];
-        $value = $row[2];
-        // { stat => timestamp => value }
-        $returnedData[$stat][$timestamp_s] = $value;
-    }*/
     $res->free_result();
 
     foreach ($returnedData as &$data) {

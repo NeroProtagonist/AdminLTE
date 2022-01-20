@@ -208,8 +208,14 @@
           function(index, entry) {
 
             let stat = Number(entry.stat);
+            if (prevValue[stat] == null) {
+              prevValue[stat] = entry.value;
+            }
             let deltaV = entry.value - prevValue[stat];
             prevValue[stat] = entry.value;
+            if (prevDateTime[stat] == null) {
+              prevDateTime[stat] = Number(entry.dateTime);
+            }
             let deltaT = Number(entry.dateTime) - prevDateTime[stat];
             prevDateTime[stat] = Number(entry.dateTime);
 
@@ -223,11 +229,6 @@
               case 5:
               case 33:
               {
-                if (deltaV == entry.value) {
-                  // Ignore first value
-                  break;
-                }
-
                 if (deltaV != 0 && deltaT > period_s * 0.9) {
                   chart.data.datasets[0].data.push(deltaV);
                   let tVal = Number(entry.dateTime) - deltaT / 2;
