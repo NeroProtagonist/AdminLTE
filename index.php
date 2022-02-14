@@ -142,7 +142,7 @@
       function(stats) {
         let row = 0;
         for (let statRow in energyStatsLayout) {
-          let sampleTime = moment(stats[energyStatsLayout[statRow][0]].dateTime + ' +00:00', 'YYYY-MM-DD HH:mm:ss ZZ');
+          let sampleTime = moment(new Date(Number(stats[energyStatsLayout[statRow][0]].ts * 1000)));
           let txt = `
             <div class="row">
               <div class="col-sm">

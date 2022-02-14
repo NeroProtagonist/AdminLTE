@@ -79,7 +79,7 @@ if (isset($_GET['getLastValues']) && isset($_GET['meter'])) {
         }
         $where .= ")";
     }
-    $sql = "SELECT l.stat, l.dateTime, l.value, stats.unit, stats.description FROM log l
+    $sql = "SELECT l.stat, l.ts, l.value, stats.unit, stats.description FROM log l
                     INNER JOIN (SELECT MAX(recent.ts) ts FROM
                             (SELECT ts, stat FROM log ${where} ORDER BY ts DESC LIMIT 1000) recent GROUP BY stat) recent ON l.ts = recent.ts
                     INNER JOIN stats ON l.stat = stats.stat";
@@ -318,10 +318,10 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
 
     // TODO: Perhaps SQL can sum up energy for time period
 
-    $timeLimit = getSQLDateTimeLimit();
+    $timeLimit = getSQLTimestampLimit();
 
     $logConnection->select_db('meterLogs');
-    $sql = "SELECT dateTime, stat, value FROM log WHERE";
+    $sql = "SELECT ts, stat, value FROM log WHERE";
     if ($timeLimit != '') {
         $sql .= " $timeLimit AND";
     }
@@ -329,7 +329,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
     list($fromTime, $toTime) = getQueryTimespan();
     $interval_s = $_GET['period_s'];
     $samplingPeriod = 30;
-    $sql .= " (TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10) % $interval_s <= $samplingPeriod ORDER BY stat, dateTime";
+    $sql .= " (TRUNCATE(ts / 10, 0) * 10) % $interval_s <= $samplingPeriod ORDER BY stat, ts";
 
     $res = $logConnection->query($sql);
     if (!$res) {
@@ -338,10 +338,6 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
 
     $returnedData = $res->fetch_all(MYSQLI_ASSOC);
     $res->free_result();
-
-    foreach ($returnedData as &$data) {
-        $data['dateTime'] = sqlDateTimeToTimestamp($data['dateTime']);
-    }
 
     //addDebugData($returnedData, 'query', $sql);
 

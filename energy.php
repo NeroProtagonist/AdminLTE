@@ -113,6 +113,10 @@
     graphs.set(name, g);
   }
 
+  let statToPrice = { 4: 0,
+                        5: 0,
+                        33: 0 };
+
   function getPeriod(str) {
     let [period_s, unit, startDate] = function() {
       switch (str) {
@@ -142,6 +146,8 @@
     $('#querytime').daterangepicker(makeDefaultTimePickerOptions());
 
     // Initial meter fetch
+    initPrices()
+    console.log(statToPrice);
     fetchAndUpdateMeter()
 
     // Initial solar fetch
@@ -177,6 +183,19 @@
     };
   }
 
+  function initPrices() {
+    $.ajax( {
+      dataType: "json",
+      url: "api_db.php?getPrices&meter",
+      success: function(data) {
+          for (let g of data) {
+            statToPrice[Number(g.stat)] = Number(g.value);
+          }
+        },
+      async: false
+      });
+  }
+
   function fetchAndUpdateMeter() {
     let v = $('#meterPeriod option:selected').val();
     let [period_s, unit, startDate, endDate] = getPeriod(v);
@@ -196,7 +215,7 @@
 
         // Find first elec value
         let prevValue = [];
-        let prevDateTime = [];
+        let prevTS = [];
 
         const statToChart = { 4: meterGraphs.get('elecReceived').chart,
                               5: meterGraphs.get('elecReceived').chart,
@@ -213,11 +232,11 @@
             }
             let deltaV = entry.value - prevValue[stat];
             prevValue[stat] = entry.value;
-            if (prevDateTime[stat] == null) {
-              prevDateTime[stat] = Number(entry.dateTime);
+            if (prevTS[stat] == null) {
+              prevTS[stat] = Number(entry.ts);
             }
-            let deltaT = Number(entry.dateTime) - prevDateTime[stat];
-            prevDateTime[stat] = Number(entry.dateTime);
+            let deltaT = Number(entry.ts) - prevTS[stat];
+            prevTS[stat] = Number(entry.ts);
 
             let chart = statToChart[stat];
             if (chart == null) {
@@ -231,7 +250,7 @@
               {
                 if (deltaV != 0 && deltaT > period_s * 0.9) {
                   chart.data.datasets[0].data.push(deltaV);
-                  let tVal = Number(entry.dateTime) - deltaT / 2;
+                  let tVal = Number(entry.ts) - deltaT / 2;
                   chart.data.labels.push(new Date(tVal * 1000));
                 }
 
@@ -242,7 +261,7 @@
                 if (deltaT > period_s * 0.95) {
                   // TODO: Could choose max of this and current
                   chart.data.datasets[0].data.push(Number(entry.value));
-                  chart.data.labels.push(new Date(Number(entry.dateTime * 1000)));
+                  chart.data.labels.push(new Date(Number(entry.ts * 1000)));
                 }
                 break;
               }
