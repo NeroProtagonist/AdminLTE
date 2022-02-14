@@ -80,8 +80,8 @@ if (isset($_GET['getLastValues']) && isset($_GET['meter'])) {
         $where .= ")";
     }
     $sql = "SELECT l.stat, l.dateTime, l.value, stats.unit, stats.description FROM log l
-                    INNER JOIN (SELECT MAX(recent.recordId) recordId FROM
-                            (SELECT recordId, stat FROM log ${where} ORDER BY recordId DESC LIMIT 1000) recent GROUP BY stat) recent ON l.recordId = recent.recordId
+                    INNER JOIN (SELECT MAX(recent.ts) ts FROM
+                            (SELECT ts, stat FROM log ${where} ORDER BY ts DESC LIMIT 1000) recent GROUP BY stat) recent ON l.ts = recent.ts
                     INNER JOIN stats ON l.stat = stats.stat";
     $res = $logConnection->query($sql);
 
@@ -329,7 +329,7 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
     list($fromTime, $toTime) = getQueryTimespan();
     $interval_s = $_GET['period_s'];
     $samplingPeriod = 30;
-    $sql .= " (TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10 + $samplingPeriod) % $interval_s <= $samplingPeriod ORDER BY stat, dateTime";
+    $sql .= " (TRUNCATE(TIME_TO_SEC(dateTime) / 10, 0) * 10) % $interval_s <= $samplingPeriod ORDER BY stat, dateTime";
 
     $res = $logConnection->query($sql);
     if (!$res) {
@@ -352,5 +352,22 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
 
 // Whoa - Calculate average power over 15 second window for last 10 minutes of data
 // SELECT *, AVG(value) OVER (ORDER BY unix_timestamp(dateTime) RANGE BETWEEN 15 PRECEDING AND CURRENT ROW ) FROM (SELECT *, UNIX_TIMESTAMP(dateTime) FROM log WHERE dateTime > UTC_TIMESTAMP() - INTERVAL 10 MINUTE AND stat = 9) recent
+
+if (isset($_GET['getPrices']) && isset($_GET['meter'])) {
+
+    $logConnection->select_db('meterLogs');
+    $sql = "SELECT * FROM prices";
+    $res = $logConnection->query($sql);
+    if (!$res) {
+        die("Table query failed: (" . $logConnection->errno . ") " . $logConnection->error);
+    }
+
+    $returnedData = $res->fetch_all(MYSQLI_ASSOC);
+    $res->free_result();
+
+    header('Content-type: application/json');
+    echo json_encode($returnedData);
+    return;
+}
 
 die("no command?");
