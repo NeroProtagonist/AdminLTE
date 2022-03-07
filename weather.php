@@ -206,13 +206,14 @@
         }
 
         $.when.apply($, deviceRequests).done(function() {
-          for (let resultIndex in arguments) {
-            data = arguments[resultIndex][0];
+          let responses = deviceRequests.length === 1 ? [arguments] : arguments;
+          for (let resultIndex in responses) {
+            let deviceData = responses[resultIndex][0];
             for (let graphName in graphs) {
               let graph = graphs[graphName];
-              let deviceIndex = graph.chart.indexToDevice.indexOf(data['deviceId']);
+              let deviceIndex = graph.chart.indexToDevice.indexOf(deviceData['deviceId']);
               if (graph.chart.data.datasets[deviceIndex] !== undefined) {
-                graph.chart.data.datasets[deviceIndex].label = data['friendlyName'];
+                graph.chart.data.datasets[deviceIndex].label = deviceData['friendlyName'];
               }
             }
           }
