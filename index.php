@@ -77,6 +77,8 @@
   }
 
   let energyStatsLayout = [ [ 9, 10 ] ];
+  let statDescOverride = new Map( [ [9, "Power Received"],
+                                  [10, "Power Sent" ] ]);
   let energyStatsRowDesc = [ 'Power' ];
 
   function initStats() {
@@ -162,7 +164,7 @@
                 <div class="small-box bg-primary">
                   <div class="inner">
                     <h3 id="${displaySet.id}">${displaySet.text}</h3>
-                    <p>${stats[stat]['description']}</p>
+                    <p>${statDescOverride.get(stat)}</p>
                   </div>
                   <div class="icon">
                     <i class="fas fa-bolt"></i>
