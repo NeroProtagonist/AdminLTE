@@ -1,8 +1,8 @@
 export class Graph {
-  constructor(type, prefix, label) {
+  constructor(type, prefix, labels) {
     this.type = type;
     this.prefix = prefix;
-    this.label = label;
+    this.labels = labels
     this.options = JSON.parse(JSON.stringify(this.makeDefaultGraphOptions()));
   }
 

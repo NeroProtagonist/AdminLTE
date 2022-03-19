@@ -66,9 +66,9 @@
   import { Graph } from './graph.js';
   import { getSeconds } from './graph.js';
 
-  var graphs = { "temp": new Graph('line', 'temp', ''),
-                 "humidity": new Graph('line', 'humidity', ''),
-                 "pressure": new Graph('line', 'pressure', '')
+  var graphs = { "temp": new Graph('line', 'temp', ['']),
+                 "humidity": new Graph('line', 'humidity', ['']),
+                 "pressure": new Graph('line', 'pressure', [''])
               };
 
   graphs['humidity'].options.scales.yAxes[0].ticks.beginAtZero = false;

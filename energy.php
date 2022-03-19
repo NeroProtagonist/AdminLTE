@@ -96,12 +96,12 @@
   import { Graph } from './graph.js';
   import { getSeconds } from './graph.js';
 
-  let solarGraphs = new Map([ ["solarPower", new Graph('line', "solar-power", 'Power output (W)')],
-                              ["solarEnergy", new Graph('bar', "solar-energy", 'Energy produced (Wh)')]
+  let solarGraphs = new Map([ ["solarPower", new Graph('line', "solar-power", [ 'Power output (W)' ])],
+                              ["solarEnergy", new Graph('bar', "solar-energy", [ 'Energy produced (Wh)' ])]
                             ]);
-  let meterGraphs = new Map([ ['elecReceived', new Graph('bar', 'meter-elec-received', 'Energy from supplier (kWh)')],
-                              ['powerReceived', new Graph('line', 'meter-power-received', 'Power from supplier (kW)')],
-                              ['gasReceived', new Graph('bar', 'meter-gas-received', 'Gas from supplier (m^3)')]
+  let meterGraphs = new Map([ ['elecReceived', new Graph('bar', 'meter-elec-received', [ 'Energy from supplier (kWh)', 'Energy to supplier (kWh)' ])],
+                              ['powerReceived', new Graph('line', 'meter-power-received', [ 'Power from supplier (kW)', 'Power to supplier (kW)' ])],
+                              ['gasReceived', new Graph('bar', 'meter-gas-received', [ 'Gas from supplier (m^3)' ])]
                             ]);
 
   let graphs = new Map();
@@ -135,10 +135,6 @@
 
       graph.chart = new Chart(canvas, {
         type: graph.type,
-        data: {
-          labels: [ ],
-          datasets: [ { data: [] }]
-        },
         options: graph.options
       });
     }
@@ -174,13 +170,16 @@
 
   function resetGraph(graph) {
     graph.chart.data.labels = [];
-    graph.chart.data.datasets[0] = {
-      label: graph.label,
-      backgroundColor: makeDefaultGraphColours().red,
-      borderColor: makeDefaultGraphColours().red,
-      fill: false,
-      data: []
-    };
+    let chartColours = makeDefaultGraphColours();
+    for (let i = 0; i < graph.labels.length; ++i) {
+      graph.chart.data.datasets[i] = {
+        label: graph.labels[i],
+        backgroundColor: Object.keys(chartColours)[i],
+        borderColor: Object.keys(chartColours)[i],
+        fill: false,
+        data: []
+      };
+    }
   }
 
   function initPrices() {
@@ -217,10 +216,13 @@
         let prevValue = [];
         let prevTS = [];
 
-        const statToChart = { 4: meterGraphs.get('elecReceived').chart,
-                              5: meterGraphs.get('elecReceived').chart,
-                              9: meterGraphs.get('powerReceived').chart,
-                              33: meterGraphs.get('gasReceived').chart
+        const statToChart = { 4: { chart: meterGraphs.get('elecReceived').chart, dataset: 0 },
+                              5: { chart: meterGraphs.get('elecReceived').chart, dataset: 0 },
+                              6: { chart: meterGraphs.get('elecReceived').chart, dataset: 1 },
+                              7: { chart: meterGraphs.get('elecReceived').chart, dataset: 1 },
+                              9: { chart: meterGraphs.get('powerReceived').chart, dataset: 0 },
+                              10: { chart: meterGraphs.get('powerReceived').chart, dataset: 1 },
+                              33: { chart: meterGraphs.get('gasReceived').chart, dataset: 0 },
                             };
 
         $.each(data,
@@ -238,30 +240,32 @@
             let deltaT = Number(entry.ts) - prevTS[stat];
             prevTS[stat] = Number(entry.ts);
 
-            let chart = statToChart[stat];
-            if (chart == null) {
+            if (statToChart[stat] == null) {
               return;
             }
+            let chart = statToChart[stat].chart;
+            let dataset = chart.data.datasets[statToChart[stat].dataset];
 
-            switch (Number(entry.stat)) {
+            switch (stat) {
               case 4:
               case 5:
+              case 6:
+              case 7:
               case 33:
               {
                 if (deltaV != 0 && deltaT > period_s * 0.9) {
-                  chart.data.datasets[0].data.push(deltaV);
                   let tVal = Number(entry.ts) - deltaT / 2;
-                  chart.data.labels.push(new Date(tVal * 1000));
+                  dataset.data.push( { t: new Date(tVal * 1000), y: deltaV } );
                 }
 
                 break;
               }
               case 9:
+              case 10:
               {
                 if (deltaT > period_s * 0.95) {
                   // TODO: Could choose max of this and current
-                  chart.data.datasets[0].data.push(Number(entry.value));
-                  chart.data.labels.push(new Date(Number(entry.ts * 1000)));
+                  dataset.data.push({ t: new Date(Number(entry.ts * 1000)), y: Number(entry.value) } );
                 }
                 break;
               }
@@ -271,11 +275,8 @@
         for (let [, graph] of meterGraphs) {
           graph.chart.options.scales.xAxes[0].time.unit = unit;
           graph.chart.options.scales.xAxes[0].time.stepSize = period_s / getSeconds(unit);
-        }
-
-        for (let g of [4, 5, 33]) {
-          statToChart[g].options.scales.xAxes[0].ticks.min = startDate;
-          statToChart[g].options.scales.xAxes[0].ticks.max = endDate;
+          graph.chart.options.scales.xAxes[0].ticks.min = startDate;
+          graph.chart.options.scales.xAxes[0].ticks.max = endDate;
         }
 
         for (let [, graph] of meterGraphs) {
