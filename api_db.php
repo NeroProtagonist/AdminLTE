@@ -9,9 +9,36 @@ if ($logConnection->connect_errno) {
     die("Failed to connect to server: (" . $logConnection->connect_errno . ") " . $logConnection->connect_error);
 }
 
+function parseCommaGetParam($param)
+{
+    $values = array();
+    if (isset($_GET[$param])) {
+        $split = preg_split('/,/', $_GET[$param]);
+        foreach ($split as $val) {
+            if ($val != '' && !is_numeric($val)) {
+                die("{$val} not numeric");
+            }
+            if ($val != '') {
+                $values[] = $val;
+            }
+        }
+    }
+
+    return $values;
+}
+
 if (isset($_GET['getDeviceIds'])) {
     $logConnection->select_db("sensorLogs");
     $sql = "SELECT deviceId FROM devices";
+
+    $types = parseCommaGetParam('types');
+    if (sizeof($types) != 0) {
+        $sql .= " WHERE FIND_IN_SET('$types[0]', dataTypes) > 0";
+        for ($n = 1; $n < sizeof($types); $n++) {
+            $sql .= " OR FIND_IN_SET('$types[$n]', dataTypes) > 0";
+        }
+    }
+
     $res = $logConnection->query($sql);
     $data = array();
     while ($row = $res->fetch_assoc()) {
@@ -24,12 +51,17 @@ if (isset($_GET['getDeviceIds'])) {
     return;
 }
 
-if (isset($_GET['getLastValues']) && isset($_GET['weather'])) {
+if (isset($_GET['getLastValues']) && isset($_GET['sensor'])) {
     if (!isset($_GET['deviceId'])) {
         die('deviceId not set');
     }
 
     $deviceId = $_GET['deviceId'];
+
+    $ignore = '';
+    if (isset($_GET['ignoreOlderThan'])) {
+        $ignore = ' AND ts >= ' . $_GET['ignoreOlderThan'];
+    }
 
     $data = array();
 
@@ -40,7 +72,7 @@ if (isset($_GET['getLastValues']) && isset($_GET['weather'])) {
     $dataTypes = explode(',', $res->fetch_array()[0]);
     foreach($dataTypes as $type)
     {
-        $sql = "SELECT ts, type, value FROM log WHERE deviceId = {$deviceId} AND type = {$type} ORDER BY ts DESC LIMIT 1";
+        $sql = "SELECT ts, type, value FROM log WHERE deviceId = {$deviceId} AND type = {$type}" . $ignore . " ORDER BY ts DESC LIMIT 1";
         $res2 = $logConnection->query($sql);
         while ($row2 = $res2->fetch_assoc()) {
             $data[] = $row2;
@@ -55,18 +87,7 @@ if (isset($_GET['getLastValues']) && isset($_GET['weather'])) {
 }
 
 if (isset($_GET['getLastValues']) && isset($_GET['meter'])) {
-    $stats = array();
-    if (isset($_GET['stats'])) {
-        $split = preg_split('/,/', $_GET['stats']);
-        foreach ($split as $stat) {
-            if ($stat != '' && !is_numeric($stat)) {
-                die("{$stat} not numeric");
-            }
-            if ($stat != '') {
-                $stats[] = $stat;
-            }
-        }
-    }
+    $stats = parseCommaGetParam('stats');
 
     // Fetch all stats
     $logConnection->select_db("meterLogs");

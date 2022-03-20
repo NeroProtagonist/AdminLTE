@@ -45,11 +45,24 @@
       <div id="meterInsert">
         <!-- Insertion place for energy meter data -->
 
-      </div> <!-- .container-fluid -->
+      </div>
       <div id="solarInsert">
         <!-- Insertion place for solar data -->
 
-      </div> <!-- .container-fluid -->
+      </div>
+    </div>
+  </div> <!-- .container-fluid -->
+
+  <div class="card" class="container-fluid">
+    <div class="card-header">
+      <h3 class="card-title">
+        Air Quality
+      </h3>
+    </div>
+    <div class="card-body">
+      <div id="airqInsert">
+        <!-- Insertion place for air quality data -->
+      </div>
     </div>
   </div>
 </div>
@@ -61,14 +74,15 @@
 <script>
   "use strict";
 
-  let devs = [];
-
-  function getWeatherDisplaySet(deviceId, value) {
+  function getSensorDisplaySet(deviceId, value) {
     let val = Number(value['value']);
     switch (Number(value['type'])) {
       case 0: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(1) + '&#x2103;', type: 'Temperature', bg: 'primary' };
       case 1: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0) + '%', type: 'Relative Humidity', bg: 'secondary' };
       case 2: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(1), type: 'Pressure', bg: 'success' };
+      case 3: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0), type: 'PM 1.0', bg: 'primary' };
+      case 4: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0), type: 'PM 2.5', bg: 'secondary' };
+      case 5: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0), type: 'PM 10.0', bg: 'success' };
     }
   }
 
@@ -76,70 +90,103 @@
     return { id: `meter_${value['stat']}`, text : `${value['value']} ${value['unit']}` };
   }
 
-  let energyStatsLayout = [ [ 9, 10 ] ];
-  let statDescOverride = new Map( [ [9, "Power Received"],
+  let devs = [];
+  const energyStatsLayout = [ [ 9, 10 ] ];
+  const statDescOverride = new Map( [ [9, "Power Received"],
                                   [10, "Power Sent" ] ]);
-  let energyStatsRowDesc = [ 'Power' ];
+  const energyStatsRowDesc = [ 'Power' ];
+
+  function getLastSensorValues(devs, link) {
+    let timeLimitUTC = Math.trunc(moment().subtract(24, "hours").valueOf() / 1000);
+    for (let deviceId of devs) {
+      $.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId,
+        function(desc) {
+          $.getJSON(`api_db.php?getLastValues&sensor&deviceId=${deviceId}&ignoreOlderThan=${timeLimitUTC}`,
+            function(values) {
+              if (values.length == 0) {
+                return;
+              }
+              // Device name
+              let sampleTime = moment(new Date(Number(values[0].ts * 1000)));
+              let sampleColour = moment().diff(sampleTime, 'hours') > 1 ? 'bg-warning' : '';
+              let txt = `
+                <div class="row">
+                  <div class="col-sm">
+                    <h5 class="mb-2">${desc['friendlyName']}</h5>
+                  </div>
+                  <div class="col-sm">
+                    <div class="float-sm-right">
+                      <p class="mb-2 ${sampleColour}">${sampleTime.format('ddd DD/MM/YY HH:mm:ss')}</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">`;
+              for (let value of values) {
+                let displaySet = getSensorDisplaySet(deviceId, value);
+                // One box per stat on the same row
+                txt += `
+                  <div class="col-md-3">
+                    <div class="small-box bg-${displaySet.bg}">
+                      <div class="inner">
+                        <h3 id="${displaySet.id}">${displaySet.value}</h3>
+                        <p>${displaySet.type}</p>
+                      </div>
+                      <div class="icon">
+                        <i class="fas fa-thermometer-half"></i>
+                      </div>
+                      <a href="${link}" class="small-box-footer">
+                        Data <i class="fas fa-arrow-circle-right"></i>
+                      </a>
+                    </div>
+                  </div>`;
+              }
+              txt += `</div>`;
+              $(`#dev${deviceId}`).append(txt);
+            }); // getLastValues&weather
+        }); // getDeviceDesc
+    }
+  }
 
   function initStats() {
-    $.getJSON("api_db.php?getDeviceIds",
-      function(data) {
-        // Clear everything under insertion point
-        $('#weatherInsert').empty();
+    /***********************
+    /* Weather
+    /**********************/
+
+    // Clear everything under insertion point
+    $('#weatherInsert').empty();
+
+    $.getJSON("api_db.php?getDeviceIds&types=0,1,2",
+      function(devs) {
 
         // Insert divs for each device so that devices are ordered on page by device Id
-        for (let deviceId of data) {
+        for (let deviceId of devs) {
           $('#weatherInsert').append(`<div id=dev${deviceId}></div>`);
         }
 
-        devs = data;
-
-        for (let deviceId of devs) {
-          $.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId,
-            function(desc) {
-              $.getJSON("api_db.php?getLastValues&weather&deviceId=" + deviceId,
-                function(values) {
-                  // Device name
-                  let sampleTime = moment(new Date(Number(values[0].ts * 1000)));
-                  let txt = `
-                    <div class="row">
-                      <div class="col-sm">
-                        <h5 class="mb-2">${desc['friendlyName']}</h5>
-                      </div>
-                      <div class="col-sm">
-                        <div class="float-sm-right">
-                          <p class="mb-2">${sampleTime.format('ddd DD/MM/YY HH:mm:ss')}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="row">`;
-                  for (let value of values) {
-                    let displaySet = getWeatherDisplaySet(deviceId, value);
-                    // One box per stat on the same row
-                    txt += `
-                      <div class="col-md-3">
-                        <div class="small-box bg-${displaySet.bg}">
-                          <div class="inner">
-                            <h3 id="${displaySet.id}">${displaySet.value}</h3>
-                            <p>${displaySet.type}</p>
-                          </div>
-                          <div class="icon">
-                            <i class="fas fa-thermometer-half"></i>
-                          </div>
-                          <a href="weather.php" class="small-box-footer">
-                            Data <i class="fas fa-arrow-circle-right"></i>
-                          </a>
-                        </div>
-                      </div>`;
-                  }
-                  txt += `</div>`;
-                  $(`#dev${deviceId}`).append(txt);
-                }); // getLastValues&weather
-            }); // getDeviceDesc
-        }
+        getLastSensorValues(devs, 'weather.php');
       }); // getDeviceIds
 
-    $('#meterInsert').empty()
+    /***********************
+    /* Air Quality
+    /**********************/
+    $('#airqInsert').empty();
+
+    $.getJSON("api_db.php?getDeviceIds&types=3,4,5",
+      function(devs) {
+
+        // Insert divs for each device so that devices are ordered on page by device Id
+        for (let deviceId of devs) {
+          $('#airqInsert').append(`<div id=dev${deviceId}></div>`);
+        }
+
+        getLastSensorValues(devs, 'airquality.php');
+      }); // getDeviceIds
+
+    /***********************
+    /* Energy
+    /**********************/
+    $('#meterInsert').empty();
+
     $.getJSON("api_db.php?getLastValues&meter&stats=9,10",
       function(stats) {
         let row = 0;
@@ -186,10 +233,10 @@
   let statsRefresh = [
     { updateFunc: function() {
                     for (let deviceId of devs) {
-                      $.getJSON("api_db.php?getLastValues&weather&deviceId=" + deviceId,
+                      $.getJSON("api_db.php?getLastValues&sensor&deviceId=" + deviceId,
                         function(values) {
                           for (let value of values) {
-                            let displaySet = getWeatherDisplaySet(deviceId, value);
+                            let displaySet = getSensorDisplaySet(deviceId, value);
                             $(`#${displaySet.id}`).html(displaySet.value);
                           }
                         });
