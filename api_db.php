@@ -27,6 +27,15 @@ function parseCommaGetParam($param)
     return $values;
 }
 
+function makeSQLIn($column, $values) {
+    $sql = "{$column} IN ({$values[0]}";
+    for ($n = 1; $n < sizeof($values); $n++) {
+        $sql .= ",{$values[$n]}";
+    }
+    $sql .= ")";
+    return $sql;
+}
+
 if (isset($_GET['getDeviceIds'])) {
     $logConnection->select_db("sensorLogs");
     $sql = "SELECT deviceId FROM devices";
@@ -94,11 +103,7 @@ if (isset($_GET['getLastValues']) && isset($_GET['meter'])) {
     //$sql = "SELECT l.stat, l.dateTime, l.value, stats.unit, stats.description FROM log l INNER JOIN (SELECT MAX(recordId) rec FROM log GROUP BY stat) recent ON l.recordId = recent.rec INNER JOIN stats ON l.stat = stats.stat";
     $where = "";
     if (sizeof($stats) != 0) {
-        $where = "WHERE stat in ({$stats[0]}";
-        for ($n = 1; $n < sizeof($stats); $n++) {
-            $where .= ",{$stats[$n]}";
-        }
-        $where .= ")";
+        $where = "WHERE " . makeSQLIn('stat', $stats);
     }
     $sql = "SELECT l.stat, l.ts, l.value, stats.unit, stats.description FROM log l
                     INNER JOIN (SELECT MAX(recent.ts) ts FROM
@@ -235,7 +240,7 @@ if (isset($_GET['getGraphData2']) && isset($_GET['weather'])) {
     return;
 }
 
-if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
+if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
 
     # Requires from+to
     if (!isset($_GET['from']) || !isset($_GET['to'])) {
@@ -246,6 +251,12 @@ if (isset($_GET['getGraphData3']) && isset($_GET['weather'])) {
 
     $logConnection->select_db("sensorLogs");
     $sql = "SELECT ts, deviceId, type, value FROM log WHERE";
+
+    $types = parseCommaGetParam('types');
+    if (sizeof($types) != 0) {
+        $sql .= " " . makeSQLIn('type', $types) . " AND";
+    }
+
     if ($timeLimit != '') {
         $sql .= " $timeLimit AND";
     }

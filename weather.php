@@ -46,10 +46,8 @@
       newChart("pressure", "Pressure");
     ?>
 
-  </div><!-- /.container-fluid -->
-</div>
-<!-- /.content -->
-</div>
+  </div> <!-- /.container-fluid -->
+</div> <!-- /.content -->
 
 <!-- ChartJS -->
 <script src="plugins/moment/moment.min.js"></script>
@@ -137,7 +135,7 @@
 
     let startUTC = Math.trunc(startDate.valueOf() / 1000);
     let endUTC = Math.trunc(endDate.valueOf() / 1000);
-    $.getJSON("api_db.php?getGraphData3&weather&from=" + startUTC + "&to=" + endUTC,
+    $.getJSON(`api_db.php?getGraphData3&sensor&from=${startUTC}&to=${endUTC}&types=0,1,2`,
       function (data) {
         let totalNum = 0;
 
