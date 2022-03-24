@@ -123,3 +123,19 @@ export function getSeconds(unit) {
   }
   return null;
 }
+
+export function getRawDataPeriod(duration) {
+  if (duration <= 5 * 60) {
+    return [ 30, 'second' ];
+  }
+  if (duration <= 1 * 60 * 60) {
+    return [ 10 * 60, 'hour' ];
+  }
+  if (duration <= 6 * 60 * 60) {
+    return [ 30 * 60, 'hour' ];
+  }
+  if (duration <= 24 * 60 * 60) {
+    return [ 60 * 60, 'hour' ];
+  }
+  return [ 24 * 60 * 60, 'day' ];
+}

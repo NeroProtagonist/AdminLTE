@@ -7,7 +7,7 @@
   <div class="container-fluid">
     <div class="row mb-2">
       <div class="col-sm">
-        <h1 class="m-0 text-dark">Weather</h1>
+        <h1 class="m-0 text-dark">Air Quality</h1>
       </div>
     </div>
   </div>
@@ -41,9 +41,7 @@
     </div>
 
     <?php
-      newChart("temp", "Temperature");
-      newChart("humidity", "Humidity");
-      newChart("pressure", "Pressure");
+      newChart("airq", "Air Quality");
     ?>
 
   </div> <!-- /.container-fluid -->
@@ -61,17 +59,9 @@
 
   import * as Graph from './graph.js';
 
-  var graphs = { "temp": new Graph.Graph('line', 'temp', ['']),
-                 "humidity": new Graph.Graph('line', 'humidity', ['']),
-                 "pressure": new Graph.Graph('line', 'pressure', [''])
-              };
-
-  graphs['humidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
-  graphs['pressure'].options.scales.yAxes[0].ticks.beginAtZero = false;
+  var graphs = { "airq": new Graph.Graph('line', 'airq', ['PM1.0', 'PM2.5', 'PM10']) };
 
   $(document).ready(function () {
-    window.chartColors = Graph.makeDefaultGraphColours();
-
     for (let graphName in graphs) {
       let graph = graphs[graphName];
 
@@ -86,7 +76,7 @@
     $('#querytime').daterangepicker(Graph.makeDefaultTimePickerOptions());
 
     // Initial fetch
-    const deltaSeconds_str = sessionStorage.getItem('weatherPreviousDeltaSeconds');
+    const deltaSeconds_str = sessionStorage.getItem('airqPreviousDeltaSeconds');
 
     let picker = $('#querytime').data('daterangepicker');
     let startDate = picker.startDate;
@@ -103,8 +93,22 @@
     fetchAndUpdate(picker.startDate, picker.endDate, picker.locale.format);
   });
 
+  function resetGraph(graph) {
+    graph.chart.data.labels = [];
+    let chartColours = Graph.makeDefaultGraphColours();
+    for (let i = 0; i < graph.labels.length; ++i) {
+      graph.chart.data.datasets[i] = {
+        label: graph.labels[i],
+        backgroundColor: Object.keys(chartColours)[i],
+        borderColor: Object.keys(chartColours)[i],
+        fill: false,
+        data: []
+      };
+    }
+  }
+
   function fetchAndUpdate(startDate, endDate, dateFormat) {
-    sessionStorage.setItem('weatherPreviousDeltaSeconds', endDate.diff(startDate, 'seconds'));
+    sessionStorage.setItem('airqPreviousDeltaSeconds', endDate.diff(startDate, 'seconds'));
 
     $('#querytime').val(startDate.format(dateFormat) + " - " + endDate.format(dateFormat) + " (" + Graph.deltaString(startDate, endDate) + ")");
     for (let graphName in graphs) {
@@ -113,19 +117,16 @@
 
     let startUTC = Math.trunc(startDate.valueOf() / 1000);
     let endUTC = Math.trunc(endDate.valueOf() / 1000);
-    $.getJSON(`api_db.php?getGraphData3&sensor&from=${startUTC}&to=${endUTC}&types=0,1,2`,
+    //$.getJSON(`api_db.php?getGraphData3&sensor&from=${startUTC}&to=${endUTC}&types=3,4,5&movingAverage=120`,
+    $.getJSON(`api_db.php?getGraphData3&sensor&from=${startUTC}&to=${endUTC}&types=3,4,5`,
       function (data) {
         let totalNum = 0;
 
-        const typeToChart = { 0: graphs['temp'].chart, 1: graphs['humidity'].chart, 2: graphs['pressure'].chart };
-
         let devices = new Set();
 
-        for (let graphName in graphs) {
-          graphs[graphName].chart.indexToDevice = [];
-        }
-
         let [period_s, unit] = Graph.getRawDataPeriod(endUTC - startUTC);
+
+        resetGraph(graphs['airq']);
 
         $.each(data,
           function(deviceId, rec0) {
@@ -137,34 +138,18 @@
 
             devices.add(deviceId);
 
+            let chart = graphs['airq'].chart
+            const typeToDataset = { 3 : chart.data.datasets[0],
+                                    4 : chart.data.datasets[1],
+                                    5 : chart.data.datasets[2] };
+
             $.each(rec0,
               function(type, rec1) {
-
-                if (type > 2)
-                {
-                  return;
-                }
-
-                let chart = typeToChart[type];
-
-                if (!chart.indexToDevice.includes(deviceId)) {
-                  chart.indexToDevice.push(deviceId);
-                }
-                let deviceIndex = chart.indexToDevice.indexOf(deviceId);
-
-                chart.data.datasets[deviceIndex] =
-                {
-                  label: 'Device ' + deviceId,
-                  backgroundColor: Object.keys(window.chartColors)[deviceId - 1],
-                  borderColor: Object.keys(window.chartColors)[deviceId - 1],
-                  fill: false,
-                  data: []
-                };
-
+                let dataset = typeToDataset[type];
                 $.each(rec1,
                   function(timestamp_s, val) {
                     ++totalNum;
-                    chart.data.datasets[deviceIndex].data.push({ x: new Date(Number(timestamp_s * 1000)), y: val});
+                    dataset.data.push({ x: new Date(Number(timestamp_s * 1000)), y: val});
                   }
                 ); // $.each rec1
               }
@@ -183,16 +168,6 @@
 
         $.when.apply($, deviceRequests).done(function() {
           let responses = deviceRequests.length === 1 ? [arguments] : arguments;
-          for (let resultIndex in responses) {
-            let deviceData = responses[resultIndex][0];
-            for (let graphName in graphs) {
-              let graph = graphs[graphName];
-              let deviceIndex = graph.chart.indexToDevice.indexOf(deviceData['deviceId']);
-              if (graph.chart.data.datasets[deviceIndex] !== undefined) {
-                graph.chart.data.datasets[deviceIndex].label = deviceData['friendlyName'];
-              }
-            }
-          }
           for (let graphName in graphs) {
             let graph = graphs[graphName];
             graph.chart.options.scales.xAxes[0].time.unit = unit;

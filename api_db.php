@@ -168,18 +168,20 @@ function getSQLDateTimeLimit()
     return $limit;
 }
 
-function getSQLTimestampLimit()
+function getSQLTimestampLimit($fromTimeOffset_s = 0, $toTimeOffset_s = 0)
 {
     // Time limit
     $limit = '';
 
     list($fromTime, $toTime) = getQueryTimespan();
+    $fromTime->sub(new DateInterval("PT${fromTimeOffset_s}S"));
+    $toTime->sub(new DateInterval("PT${toTimeOffset_s}S"));
 
     if (isset($_GET['from'])) {
-        $limit .= " AND ts >= " . $fromTime->format('U');
+        $limit .= " AND ts >= {$fromTime->format('U')}";
     }
     if (isset($_GET["to"])) {
-        $limit .= " AND ts <= " . $toTime->format('U');
+        $limit .= " AND ts <= {$toTime->format('U')}";
     }
 
     // Remove first AND
@@ -253,8 +255,10 @@ if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
     $sql = "SELECT ts, deviceId, type, value FROM log WHERE";
 
     $types = parseCommaGetParam('types');
+    $sqlTypes = "";
     if (sizeof($types) != 0) {
-        $sql .= " " . makeSQLIn('type', $types) . " AND";
+        $sqlTypes = makeSQLIn('type', $types);
+        $sql .= " $sqlTypes AND";
     }
 
     if ($timeLimit != '') {
@@ -265,7 +269,21 @@ if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
     $delta_s = abs($fromTime->getTimestamp() - $toTime->getTimestamp());
     $interval_s = $delta_s / 200;
     $interval_s = max((int)((int)($interval_s) / 5) * 5, 2);
-    $sql .= " TRUNCATE(ts / 10, 0) * 10 % $interval_s = 0";
+    $sql .= " TRUNCATE(ts / 5, 0) * 5 % $interval_s = 0";
+
+    if (isset($_GET['movingAverage'])) {
+        $offset = $_GET['movingAverage'];
+        if (!is_numeric($offset)) {
+            die("_GET['movingAverage'] '$offset' not numeric");
+        }
+        $extendedTimeLimit = getSQLTimestampLimit($offset);
+        $sql = "SELECT a.ts, a.deviceId, a.type, AVG(b.value)
+                FROM
+                    ($sql) AS a
+                JOIN
+                    (SELECT ts, deviceId, type, value FROM log WHERE $sqlTypes AND $extendedTimeLimit ORDER BY deviceId, type, ts) AS b
+                ON a.deviceId = b.deviceId AND a.type = b.type AND CAST(a.ts AS SIGNED) - CAST(b.ts AS SIGNED) BETWEEN 0 AND $offset GROUP BY deviceId, type, a.ts";
+    }
 
     $res = $logConnection->query($sql);
     if (!$res) {
@@ -282,6 +300,8 @@ if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
         $returnedData[$deviceId][$type][$timestamp_s] = $value;
     }
     $res->free_result();
+
+    //addDebugData($returnedData, 'query', $sql);
 
     header('Content-type: application/json');
     echo json_encode($returnedData);
