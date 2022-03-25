@@ -74,15 +74,14 @@
 <script>
   "use strict";
 
-  function getSensorDisplaySet(deviceId, value) {
-    let val = Number(value['value']);
-    switch (Number(value['type'])) {
-      case 0: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(1) + '&#x2103;', type: 'Temperature', bg: 'primary' };
-      case 1: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0) + '%', type: 'Relative Humidity', bg: 'secondary' };
-      case 2: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(1), type: 'Pressure', bg: 'success' };
-      case 3: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0), type: 'PM 1.0', bg: 'primary' };
-      case 4: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0), type: 'PM 2.5', bg: 'secondary' };
-      case 5: return { id: "device" + deviceId + "_type" + value['type'], value: val.toFixed(0), type: 'PM 10.0', bg: 'success' };
+  function getSensorDisplaySet(deviceId, type, val) {
+    switch (type) {
+      case 0: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1) + '&#x2103;', type: 'Temperature', bg: 'primary' };
+      case 1: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(0) + '%', type: 'Relative Humidity', bg: 'secondary' };
+      case 2: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1), type: 'Pressure', bg: 'success' };
+      case 3: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1), type: 'PM 1.0', bg: 'primary' };
+      case 4: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1), type: 'PM 2.5', bg: 'secondary' };
+      case 5: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1), type: 'PM 10.0', bg: 'success' };
     }
   }
 
@@ -96,55 +95,87 @@
                                   [10, "Power Sent" ] ]);
   const energyStatsRowDesc = [ 'Power' ];
 
-  function getLastSensorValues(devs, movingAverage, link) {
-    let timeLimitUTC = Math.trunc(moment().subtract(24, "hours").valueOf() / 1000);
-    let maQuery = movingAverage !== null ? `&movingAverage=${movingAverage}` : ``;
-    for (let deviceId of devs) {
-      $.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId,
-        function(desc) {
-          $.getJSON(`api_db.php?getLastValues&sensor&deviceId=${deviceId}&ignoreOlderThan=${timeLimitUTC}${maQuery}`,
-            function(values) {
-              if (values.length == 0) {
-                return;
-              }
-              // Device name
-              let sampleTime = moment(new Date(Number(values[0].ts * 1000)));
-              let sampleColour = moment().diff(sampleTime, 'hours') > 1 ? 'bg-warning' : '';
-              let txt = `
-                <div class="row">
-                  <div class="col-sm">
-                    <h5 class="mb-2">${desc['friendlyName']}</h5>
-                  </div>
-                  <div class="col-sm">
-                    <div class="float-sm-right">
-                      <p class="mb-2 ${sampleColour}">${sampleTime.format('ddd DD/MM/YY HH:mm:ss')}</p>
-                    </div>
-                  </div>
+  function getSampleTimeElement(dev) {
+    return `device${dev}_sampleTime`;
+  }
+
+  function updateSensorValue(dev) {
+    const timeLimitUTC = Math.trunc(moment().subtract(24, "hours").valueOf() / 1000);
+    const maQuery = dev.movingAverage !== null ? `&movingAverage=${dev.movingAverage}` : ``;
+    $.getJSON(`api_db.php?getLastValues&sensor&deviceId=${dev.id}&ignoreOlderThan=${timeLimitUTC}${maQuery}`,
+      function(values) {
+        if (values.length === 0) {
+          return;
+        }
+        const sampleTime = moment(new Date(Number(values[0].ts * 1000)));
+        const sampleColour = moment().diff(sampleTime, 'hours') > 1 ? 'bg-warning' : '';
+        const sampleId = getSampleTimeElement(dev.id);
+        $(`#${sampleId}`).removeClass();
+        $(`#${sampleId}`).addClass(`mb-2 ${sampleColour}`);
+        $(`#${sampleId}`).html(sampleTime.format('ddd DD/MM/YY HH:mm:ss'));
+
+        for (let value of values) {
+          let displaySet = getSensorDisplaySet(dev.id, Number(value['type']), Number(value['value']));
+          $(`#${displaySet.id}`).html(displaySet.value);
+        }
+      });
+  }
+
+  function updateSensorValues() {
+    for (let dev of allDevs) {
+      updateSensorValue(dev);
+    }
+  }
+
+  function createSensorLayout(devs, movingAverage, link) {
+
+    for (let dev of devs) {
+      const descReq = $.getJSON(`api_db.php?getDeviceDesc&deviceId=${dev.id}`);
+      const typeReq = $.getJSON(`api_db.php?getSensorDeviceTypes&deviceId=${dev.id}`);
+      $.when(descReq, typeReq).done(
+        function(descData, typesData) {
+          const desc = descData[0];
+          const types = typesData[0];
+          if (types.length == 0) {
+            return;
+          }
+          // Device name
+          let txt = `
+            <div class="row">
+              <div class="col-sm">
+                <h5 class="mb-2">${desc['friendlyName']}</h5>
+              </div>
+              <div class="col-sm">
+                <div class="float-sm-right">
+                  <p id="${getSampleTimeElement(dev.id)}"></p>
                 </div>
-                <div class="row">`;
-              for (let value of values) {
-                let displaySet = getSensorDisplaySet(deviceId, value);
-                // One box per stat on the same row
-                txt += `
-                  <div class="col-md-3">
-                    <div class="small-box bg-${displaySet.bg}">
-                      <div class="inner">
-                        <h3 id="${displaySet.id}">${displaySet.value}</h3>
-                        <p>${displaySet.type}</p>
-                      </div>
-                      <div class="icon">
-                        <i class="fas fa-thermometer-half"></i>
-                      </div>
-                      <a href="${link}" class="small-box-footer">
-                        Data <i class="fas fa-arrow-circle-right"></i>
-                      </a>
-                    </div>
-                  </div>`;
-              }
-              txt += `</div>`;
-              $(`#dev${deviceId}`).append(txt);
-            }); // getLastValues&weather
-        }); // getDeviceDesc
+              </div>
+            </div>
+            <div class="row">`;
+          for (let type of types) {
+            let displaySet = getSensorDisplaySet(dev.id, Number(type), 0);
+            // One box per stat on the same row
+            txt += `
+              <div class="col-md-3">
+                <div class="small-box bg-${displaySet.bg}">
+                  <div class="inner">
+                    <h3 id="${displaySet.id}">No data</h3>
+                    <p>${displaySet.type}</p>
+                  </div>
+                  <div class="icon">
+                    <i class="fas fa-thermometer-half"></i>
+                  </div>
+                  <a href="${link}" class="small-box-footer">
+                    Data <i class="fas fa-arrow-circle-right"></i>
+                  </a>
+                </div>
+              </div>`;
+          }
+          txt += `</div>`;
+          $(`#dev${dev.id}`).append(txt);
+
+          updateSensorValue(dev);
+        });
     }
   }
 
@@ -160,12 +191,14 @@
       function(devs) {
 
         // Insert divs for each device so that devices are ordered on page by device Id
+        let weatherDevs = [];
         for (let deviceId of devs) {
           allDevs.push( { id: deviceId, movingAverage: null } );
+          weatherDevs.push( { id: deviceId, movingAverage: null } );
           $('#weatherInsert').append(`<div id=dev${deviceId}></div>`);
         }
 
-        getLastSensorValues(devs, null, 'weather.php');
+        createSensorLayout(weatherDevs, null, 'weather.php');
       }); // getDeviceIds
 
     /***********************
@@ -177,12 +210,14 @@
       function(devs) {
 
         // Insert divs for each device so that devices are ordered on page by device Id
+        let airQDevs = [];
         for (let deviceId of devs) {
           allDevs.push( { id: deviceId, movingAverage: 120 } );
+          airQDevs.push( { id: deviceId, movingAverage: 120 } );
           $('#airqInsert').append(`<div id=dev${deviceId}></div>`);
         }
 
-        getLastSensorValues(devs, 120, 'airquality.php');
+        createSensorLayout(airQDevs, 120, 'airquality.php');
       }); // getDeviceIds
 
     /***********************
@@ -234,18 +269,8 @@
   }
 
   let statsRefresh = [
-    { updateFunc: function() {
-                    for (let dev of allDevs) {
-                      const maQuery = dev.movingAverage !== null ? `&movingAverage=${dev.movingAverage}` : ``;
-                      $.getJSON(`api_db.php?getLastValues&sensor&deviceId=${dev.id}${maQuery}`,
-                        function(values) {
-                          for (let value of values) {
-                            let displaySet = getSensorDisplaySet(dev.id, value);
-                            $(`#${displaySet.id}`).html(displaySet.value);
-                          }
-                        });
-                    }
-                  },
+    {
+      updateFunc: function() { updateSensorValues() },
       period: 5000
     },
     {

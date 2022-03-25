@@ -60,6 +60,24 @@ if (isset($_GET['getDeviceIds'])) {
     return;
 }
 
+if (isset($_GET['getSensorDeviceTypes'])) {
+    if (!isset($_GET['deviceId'])) {
+        die('deviceId not set');
+    }
+
+    $deviceId = $_GET['deviceId'];
+
+    $logConnection->select_db("sensorLogs");
+    $sql = "SELECT dataTypes FROM devices WHERE deviceId = {$deviceId}";
+    $res = $logConnection->query($sql);
+    $dataTypes = explode(',', $res->fetch_array()[0]);
+    $res->free_result();
+
+    header('Content-type: application/json');
+    echo json_encode($dataTypes);
+    return;
+}
+
 if (isset($_GET['getLastValues']) && isset($_GET['sensor'])) {
     if (!isset($_GET['deviceId'])) {
         die('deviceId not set');
