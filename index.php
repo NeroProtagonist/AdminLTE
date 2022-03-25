@@ -90,7 +90,7 @@
     return { id: `meter_${value['stat']}`, text : `${value['value']} ${value['unit']}` };
   }
 
-  let devs = [];
+  let allDevs = [];
   const energyStatsLayout = [ [ 9, 10 ] ];
   const statDescOverride = new Map( [ [9, "Power Received"],
                                   [10, "Power Sent" ] ]);
@@ -161,6 +161,7 @@
 
         // Insert divs for each device so that devices are ordered on page by device Id
         for (let deviceId of devs) {
+          allDevs.push( { id: deviceId, movingAverage: null } );
           $('#weatherInsert').append(`<div id=dev${deviceId}></div>`);
         }
 
@@ -177,6 +178,7 @@
 
         // Insert divs for each device so that devices are ordered on page by device Id
         for (let deviceId of devs) {
+          allDevs.push( { id: deviceId, movingAverage: 120 } );
           $('#airqInsert').append(`<div id=dev${deviceId}></div>`);
         }
 
@@ -233,11 +235,12 @@
 
   let statsRefresh = [
     { updateFunc: function() {
-                    for (let deviceId of devs) {
-                      $.getJSON("api_db.php?getLastValues&sensor&deviceId=" + deviceId,
+                    for (let dev of allDevs) {
+                      const maQuery = dev.movingAverage !== null ? `&movingAverage=${dev.movingAverage}` : ``;
+                      $.getJSON(`api_db.php?getLastValues&sensor&deviceId=${dev.id}${maQuery}`,
                         function(values) {
                           for (let value of values) {
-                            let displaySet = getSensorDisplaySet(deviceId, value);
+                            let displaySet = getSensorDisplaySet(dev.id, value);
                             $(`#${displaySet.id}`).html(displaySet.value);
                           }
                         });
