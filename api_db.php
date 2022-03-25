@@ -72,6 +72,13 @@ if (isset($_GET['getLastValues']) && isset($_GET['sensor'])) {
         $ignore = ' AND ts >= ' . $_GET['ignoreOlderThan'];
     }
 
+    if (isset($_GET['movingAverage'])) {
+        $offset = $_GET['movingAverage'];
+        if (!is_numeric($offset)) {
+            die("_GET['movingAverage'] '$offset' not numeric");
+        }
+    }
+
     $data = array();
 
     // Get types for device
@@ -81,7 +88,26 @@ if (isset($_GET['getLastValues']) && isset($_GET['sensor'])) {
     $dataTypes = explode(',', $res->fetch_array()[0]);
     foreach($dataTypes as $type)
     {
-        $sql = "SELECT ts, type, value FROM log WHERE deviceId = {$deviceId} AND type = {$type}" . $ignore . " ORDER BY ts DESC LIMIT 1";
+        if (!isset($offset)) {
+            $sql = "SELECT ts, type, value
+                    FROM log
+                    WHERE deviceId = {$deviceId}
+                        AND type = {$type}
+                        {$ignore}
+                    ORDER BY ts DESC LIMIT 1";
+        } else {
+            $sql = "SELECT MAX(ts) AS ts, type, AVG(value) AS value
+                    FROM log
+                    WHERE deviceId = {$deviceId}
+                        AND type = {$type}
+                        {$ignore}
+                        AND ts >= (
+                                    SELECT MAX(ts)
+                                    FROM log
+                                    WHERE deviceId = {$deviceId}
+                                        AND type = {$type}
+                                    ) - 120";
+        }
         $res2 = $logConnection->query($sql);
         while ($row2 = $res2->fetch_assoc()) {
             $data[] = $row2;
@@ -278,11 +304,21 @@ if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
         }
         $extendedTimeLimit = getSQLTimestampLimit($offset);
         $sql = "SELECT a.ts, a.deviceId, a.type, AVG(b.value)
-                FROM
-                    ($sql) AS a
-                JOIN
-                    (SELECT ts, deviceId, type, value FROM log WHERE $sqlTypes AND $extendedTimeLimit ORDER BY deviceId, type, ts) AS b
-                ON a.deviceId = b.deviceId AND a.type = b.type AND CAST(a.ts AS SIGNED) - CAST(b.ts AS SIGNED) BETWEEN 0 AND $offset GROUP BY deviceId, type, a.ts";
+                FROM (
+                    $sql
+                    ) AS a
+                    JOIN (
+                        SELECT ts, deviceId, type, value
+                        FROM log
+                        WHERE $sqlTypes
+                            AND $extendedTimeLimit
+                        ORDER BY deviceId, type, ts
+                    ) AS b
+                    ON a.deviceId = b.deviceId
+                        AND a.type = b.type
+                        AND CAST(a.ts AS SIGNED) - CAST(b.ts AS SIGNED) BETWEEN 0
+                        AND $offset
+                GROUP BY deviceId, type, a.ts";
     }
 
     $res = $logConnection->query($sql);

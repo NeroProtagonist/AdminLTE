@@ -96,12 +96,13 @@
                                   [10, "Power Sent" ] ]);
   const energyStatsRowDesc = [ 'Power' ];
 
-  function getLastSensorValues(devs, link) {
+  function getLastSensorValues(devs, movingAverage, link) {
     let timeLimitUTC = Math.trunc(moment().subtract(24, "hours").valueOf() / 1000);
+    let maQuery = movingAverage !== null ? `&movingAverage=${movingAverage}` : ``;
     for (let deviceId of devs) {
       $.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId,
         function(desc) {
-          $.getJSON(`api_db.php?getLastValues&sensor&deviceId=${deviceId}&ignoreOlderThan=${timeLimitUTC}`,
+          $.getJSON(`api_db.php?getLastValues&sensor&deviceId=${deviceId}&ignoreOlderThan=${timeLimitUTC}${maQuery}`,
             function(values) {
               if (values.length == 0) {
                 return;
@@ -163,7 +164,7 @@
           $('#weatherInsert').append(`<div id=dev${deviceId}></div>`);
         }
 
-        getLastSensorValues(devs, 'weather.php');
+        getLastSensorValues(devs, null, 'weather.php');
       }); // getDeviceIds
 
     /***********************
@@ -179,7 +180,7 @@
           $('#airqInsert').append(`<div id=dev${deviceId}></div>`);
         }
 
-        getLastSensorValues(devs, 'airquality.php');
+        getLastSensorValues(devs, 120, 'airquality.php');
       }); // getDeviceIds
 
     /***********************
