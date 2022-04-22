@@ -71,17 +71,21 @@
 <script src="../../plugins/bootstrap-switch/js/bootstrap-switch.min.js"></script>
 
 <!-- page script -->
-<script>
+<script type='module'>
   "use strict";
 
+  import * as AQI from './aqi.js';
+
   function getSensorDisplaySet(deviceId, type, val) {
+    let makeId = (deviceId, type) => "device" + deviceId + "_type" + type;
+    let makeBgId = (deviceId, type) => makeId(deviceId, type) + "_bg";
     switch (type) {
-      case 0: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1) + '&#x2103;', type: 'Temperature', bg: 'primary' };
-      case 1: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(0) + '%', type: 'Relative Humidity', bg: 'secondary' };
-      case 2: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1), type: 'Pressure', bg: 'success' };
-      case 3: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1), type: 'PM 1.0', bg: 'primary' };
-      case 4: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1), type: 'PM 2.5', bg: 'secondary' };
-      case 5: return { id: "device" + deviceId + "_type" + type, value: val.toFixed(1), type: 'PM 10.0', bg: 'success' };
+      case 0: return { id: makeId(deviceId, type), bgId: makeBgId(deviceId, type), value: val.toFixed(1) + '&#x2103;', type: 'Temperature', bg: 'primary', icon: 'fa-thermometer-half' };
+      case 1: return { id: makeId(deviceId, type), bgId: makeBgId(deviceId, type), value: val.toFixed(0) + '%', type: 'Relative Humidity', bg: 'secondary', icon: 'fa-thermometer-half' };
+      case 2: return { id: makeId(deviceId, type), bgId: makeBgId(deviceId, type), value: val.toFixed(1), type: 'Pressure', bg: 'success', icon: 'fa-thermometer-half' };
+      case 3: return { id: makeId(deviceId, type), bgId: makeBgId(deviceId, type), value: val.toFixed(1), type: 'PM 1.0', bg: 'secondary', icon: 'fa-heart' };
+      case 4: return { id: makeId(deviceId, type), bgId: makeBgId(deviceId, type), value: val.toFixed(1), type: 'PM 2.5', bg: 'secondary', icon: 'fa-heart' };
+      case 5: return { id: makeId(deviceId, type), bgId: makeBgId(deviceId, type), value: val.toFixed(1), type: 'PM 10.0', bg: 'secondary', icon: 'fa-heart' };
     }
   }
 
@@ -89,11 +93,23 @@
     return { id: `meter_${value['stat']}`, text : `${value['value']} ${value['unit']}` };
   }
 
+  function getAQIs(pm25, pm10) {
+    let pm25AQI = AQI.getAQI(AQI.getPM25Base(), AQI.getAQIBase(), pm25);
+    let pm10AQI = AQI.getAQI(AQI.getPM10Base(), AQI.getAQIBase(), pm10);
+
+    return { pm25AQI: pm25AQI, pm10AQI : pm10AQI };
+  }
+
   let allDevs = [];
   const energyStatsLayout = [ [ 9, 10 ] ];
   const statDescOverride = new Map( [ [9, "Power Received"],
                                   [10, "Power Sent" ] ]);
   const energyStatsRowDesc = [ 'Power' ];
+
+  let aqiDevices = [];
+  function getAQIElements(device) {
+    return { value: `device${device}_aqi_value`, bg: `device${device}_aqi_bg` };
+  }
 
   function getSampleTimeElement(dev) {
     return `device${dev}_sampleTime`;
@@ -114,9 +130,36 @@
         $(`#${sampleId}`).addClass(`mb-2 ${sampleColour}`);
         $(`#${sampleId}`).html(sampleTime.format('ddd DD/MM/YY HH:mm:ss'));
 
+
+        let pm10 = null, pm25 = null;
         for (let value of values) {
-          let displaySet = getSensorDisplaySet(dev.id, Number(value['type']), Number(value['value']));
+          const type = Number(value['type']);
+          const val = Number(value['value']);
+          let displaySet = getSensorDisplaySet(dev.id, type, val)
           $(`#${displaySet.id}`).html(displaySet.value);
+
+          if (type == 4) {
+            pm25 = val;
+          } else if (type == 5) {
+            pm10 = val;
+          }
+        }
+
+        if (pm10 !== null && pm25 != null) {
+          const aqi = getAQIs(pm25, pm10);
+          const elements = getAQIElements(dev.id);
+          const scheme = AQI.getScheme(Math.max(aqi.pm10AQI.cat, aqi.pm25AQI.cat));
+          let text = scheme.text;
+          if (aqi.pm25AQI.aqi > aqi.pm10AQI.aqi) {
+            text += " (PM2.5)";
+          } else if (aqi.pm25AQI.aqi < aqi.pm10AQI.aqi) {
+            text += " (PM10)";
+          } else {
+            text += " (PM2.5 = PM10)";
+          }
+          $(`#${elements.value}`).html(text);
+          $(`#${elements.bg}`).removeClass();
+          $(`#${elements.bg}`).addClass(`small-box ${scheme.color}`)
         }
       });
   }
@@ -152,18 +195,39 @@
               </div>
             </div>
             <div class="row">`;
+
+          // Add AQI stat
+          if (types.includes("4") || types.includes("5")) {
+            txt += `
+              <div class="col-md-3">
+                <div id="${getAQIElements(dev.id).bg}" class="small-box">
+                  <div class="inner">
+                    <h3 id="${getAQIElements(dev.id).value}">No data</h3>
+                    <p>AQI</p>
+                  </div>
+                  <div class="icon">
+                    <i class="fas fa-heart"></i>
+                  </div>
+                  <a href="${link}" class="small-box-footer">
+                    Data <i class="fas fa-arrow-circle-right"></i>
+                  </a>
+                </div>
+              </div>`;
+            aqiDevices.push(dev.id);
+          }
+
           for (let type of types) {
             let displaySet = getSensorDisplaySet(dev.id, Number(type), 0);
             // One box per stat on the same row
             txt += `
               <div class="col-md-3">
-                <div class="small-box bg-${displaySet.bg}">
+                <div id="${displaySet.bgId}" class="small-box bg-${displaySet.bg}">
                   <div class="inner">
                     <h3 id="${displaySet.id}">No data</h3>
                     <p>${displaySet.type}</p>
                   </div>
                   <div class="icon">
-                    <i class="fas fa-thermometer-half"></i>
+                    <i class="fas ${displaySet.icon}"></i>
                   </div>
                   <a href="${link}" class="small-box-footer">
                     Data <i class="fas fa-arrow-circle-right"></i>
