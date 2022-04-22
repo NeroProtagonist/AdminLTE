@@ -93,13 +93,6 @@
     return { id: `meter_${value['stat']}`, text : `${value['value']} ${value['unit']}` };
   }
 
-  function getAQIs(pm25, pm10) {
-    let pm25AQI = AQI.getAQI(AQI.getPM25Base(), AQI.getAQIBase(), pm25);
-    let pm10AQI = AQI.getAQI(AQI.getPM10Base(), AQI.getAQIBase(), pm10);
-
-    return { pm25AQI: pm25AQI, pm10AQI : pm10AQI };
-  }
-
   let allDevs = [];
   const energyStatsLayout = [ [ 9, 10 ] ];
   const statDescOverride = new Map( [ [9, "Power Received"],
@@ -131,28 +124,37 @@
         $(`#${sampleId}`).html(sampleTime.format('ddd DD/MM/YY HH:mm:ss'));
 
 
-        let pm10 = null, pm25 = null;
+        let pm25AQI = null, pm10AQI = null;
         for (let value of values) {
           const type = Number(value['type']);
           const val = Number(value['value']);
           let displaySet = getSensorDisplaySet(dev.id, type, val)
           $(`#${displaySet.id}`).html(displaySet.value);
 
-          if (type == 4) {
-            pm25 = val;
-          } else if (type == 5) {
-            pm10 = val;
+          if (type == 4 || type == 5) {
+            let scheme;
+            if (type == 4) {
+              pm25AQI = AQI.getAQI(AQI.getPM25Base(), AQI.getAQIBase(), val);
+              scheme = AQI.getScheme(pm25AQI.cat);
+            } else if (type == 5) {
+              pm10AQI = AQI.getAQI(AQI.getPM10Base(), AQI.getAQIBase(), val);
+              scheme = AQI.getScheme(pm10AQI.cat);
+            }
+
+            $(`#${displaySet.id}`).after(`<h3>${scheme.text}</h3>`);
+            $(`#${displaySet.bgId}`).removeClass();
+            $(`#${displaySet.bgId}`).addClass(`small-box ${scheme.color}`);
           }
         }
 
-        if (pm10 !== null && pm25 != null) {
-          const aqi = getAQIs(pm25, pm10);
+        // Update AQI pseudo stat
+        if (pm10AQI !== null && pm25AQI != null) {
           const elements = getAQIElements(dev.id);
-          const scheme = AQI.getScheme(Math.max(aqi.pm10AQI.cat, aqi.pm25AQI.cat));
+          const scheme = AQI.getScheme(Math.max(pm10AQI.cat, pm25AQI.cat));
           let text = scheme.text;
-          if (aqi.pm25AQI.aqi > aqi.pm10AQI.aqi) {
+          if (pm25AQI.aqi > pm10AQI.aqi) {
             text += " (PM2.5)";
-          } else if (aqi.pm25AQI.aqi < aqi.pm10AQI.aqi) {
+          } else if (pm25AQI.aqi < pm10AQI.aqi) {
             text += " (PM10)";
           } else {
             text += " (PM2.5 = PM10)";
