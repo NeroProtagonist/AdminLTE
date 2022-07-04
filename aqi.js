@@ -15,25 +15,25 @@ export function getAQIBase() {
 }
 
 export function getPM25Base() {
-  const pm25Base = [ 0, 15.5, 40.5, 65.5, 150.5, 250.5 ];
+  const pm25Base = [ 0, 15.5, 40.5, 65.5, 150.5, 250.5, 500.5 ];
   return pm25Base;
 }
 
 export function getPM10Base() {
-  const pm10Base = [ 0, 55, 155, 255, 355, 425 ];
+  const pm10Base = [ 0, 55, 155, 255, 355, 425, 604 ];
   return pm10Base;
 }
 
 export function getAQI(pmBase, AQIBase, pmObs) {
   let cat = 0;
-  for (let i = 1; i < 6; ++i) {
-    if (pmObs < pmBase[i]) {
-      cat = i - 1;
+  for (; cat < 6; ++cat) {
+    if (pmObs < pmBase[cat + 1]) {
       break;
     }
   }
+  cat = Math.min(cat, 5);
 
-  const aqi = ((pmObs - pmBase[cat]) * (AQIBase[cat + 1] - AQIBase[cat])) / (pmBase[cat + 1] - pmBase[cat]) + AQIBase[cat];
+  const aqi = Math.trunc(((pmObs - pmBase[cat]) * (AQIBase[cat + 1] - AQIBase[cat])) / (pmBase[cat + 1] - pmBase[cat]) + AQIBase[cat]);
   return { aqi: aqi, cat: cat };
 }
 
