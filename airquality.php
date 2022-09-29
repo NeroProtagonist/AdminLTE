@@ -164,8 +164,8 @@
 
     let startUTC = Math.trunc(startDate.valueOf() / 1000);
     let endUTC = Math.trunc(endDate.valueOf() / 1000);
-    //$.getJSON(`api_db.php?getGraphData3&sensor&from=${startUTC}&to=${endUTC}&types=3,4,5&movingAverage=120`,
-    $.getJSON(`api_db.php?getGraphData3&sensor&from=${startUTC}&to=${endUTC}&types=3,4,5`,
+    $.getJSON(`api_db.php?getGraphData3&sensor&from=${startUTC}&to=${endUTC}&types=3,4,5&movingAverage=120`,
+    //$.getJSON(`api_db.php?getGraphData3&sensor&from=${startUTC}&to=${endUTC}&types=3,4,5`,
       function (data) {
         let totalNum = 0;
 

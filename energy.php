@@ -84,7 +84,6 @@
 <!-- ChartJS -->
 <script src="plugins/moment/moment.min.js"></script>
 <script src="plugins/chart.js/Chart.js"></script>
-<!--<script src="plugins/chart.js/Chart.js"></script>-->
 <script src="plugins/daterangepicker/daterangepicker.js"></script>
 <!-- page script -->
 <script type="module">
@@ -227,6 +226,11 @@
 
         $.each(data,
           function(index, entry) {
+
+            if (index === 'debug') {
+              console.log(entry);
+              return;
+            }
 
             let stat = Number(entry.stat);
             if (prevValue[stat] == null) {

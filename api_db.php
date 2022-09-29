@@ -309,11 +309,13 @@ if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
         $sql .= " $timeLimit AND";
     }
 
+    $sql = preg_replace('/AND$/', '', $sql);
+
     list($fromTime, $toTime) = getQueryTimespan();
     $delta_s = abs($fromTime->getTimestamp() - $toTime->getTimestamp());
     $interval_s = $delta_s / 200;
     $interval_s = max((int)((int)($interval_s) / 5) * 5, 2);
-    $sql .= " TRUNCATE(ts / 5, 0) * 5 % $interval_s = 0";
+    $sql .= " GROUP BY ts DIV ($delta_s / 200), deviceId, type";
 
     if (isset($_GET['movingAverage'])) {
         $offset = $_GET['movingAverage'];
@@ -334,9 +336,9 @@ if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
                     ) AS b
                     ON a.deviceId = b.deviceId
                         AND a.type = b.type
-                        AND CAST(a.ts AS SIGNED) - CAST(b.ts AS SIGNED) BETWEEN 0
-                        AND $offset
+                        AND CAST(a.ts AS SIGNED) - CAST(b.ts AS SIGNED) BETWEEN 0 AND $offset
                 GROUP BY deviceId, type, a.ts";
+        $sql = preg_replace('/\n/', '', $sql);
     }
 
     $res = $logConnection->query($sql);
@@ -355,7 +357,7 @@ if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
     }
     $res->free_result();
 
-    //addDebugData($returnedData, 'query', $sql);
+    addDebugData($returnedData, 'query', $sql);
 
     header('Content-type: application/json');
     echo json_encode($returnedData);
@@ -429,13 +431,12 @@ if (isset($_GET['getGraphData']) && isset($_GET['meter'])) {
     $logConnection->select_db('meterLogs');
     $sql = "SELECT ts, stat, value FROM log WHERE";
     if ($timeLimit != '') {
-        $sql .= " $timeLimit AND";
+        $sql .= " $timeLimit ";
     }
 
     list($fromTime, $toTime) = getQueryTimespan();
     $interval_s = $_GET['period_s'];
-    $samplingPeriod = 30;
-    $sql .= " (TRUNCATE(ts / 10, 0) * 10) % $interval_s <= $samplingPeriod ORDER BY stat, ts";
+    $sql .= "GROUP BY ts DIV $interval_s, stat ORDER BY stat, ts";
 
     $res = $logConnection->query($sql);
     if (!$res) {
