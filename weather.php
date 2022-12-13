@@ -176,31 +176,47 @@
 
         let deviceRequests = [];
 
-        // Get device names
+        // Get locations
         for (const deviceId of devices) {
-          deviceRequests.push($.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId));
+          deviceRequests.push($.getJSON(`api_db.php?getLocation&deviceId=${deviceId}&endTS=${endUTC}`));
         }
-
         $.when.apply($, deviceRequests).done(function() {
           let responses = deviceRequests.length === 1 ? [arguments] : arguments;
+          let deviceToLocation = new Map();
           for (let resultIndex in responses) {
-            let deviceData = responses[resultIndex][0];
-            for (let graphName in graphs) {
-              let graph = graphs[graphName];
-              let deviceIndex = graph.chart.indexToDevice.indexOf(deviceData['deviceId']);
-              if (graph.chart.data.datasets[deviceIndex] !== undefined) {
-                graph.chart.data.datasets[deviceIndex].label = deviceData['friendlyName'];
+            let locationData = responses[resultIndex][0];
+            deviceToLocation.set(locationData[0]['deviceId'], locationData[0]['location']);
+          }
+
+          // Get device names
+          deviceRequests = [];
+          for (const deviceId of devices) {
+            deviceRequests.push($.getJSON("api_db.php?getDeviceDesc&deviceId=" + deviceId));
+          }
+
+          $.when.apply($, deviceRequests).done(function() {
+            let responses = deviceRequests.length === 1 ? [arguments] : arguments;
+            for (let resultIndex in responses) {
+              let deviceData = responses[resultIndex][0];
+              for (let graphName in graphs) {
+                let graph = graphs[graphName];
+                let deviceId = deviceData['deviceId'];
+                let deviceIndex = graph.chart.indexToDevice.indexOf(deviceId);
+                if (graph.chart.data.datasets[deviceIndex] !== undefined) {
+                  graph.chart.data.datasets[deviceIndex].label = deviceData['friendlyName'] + ' ' + deviceToLocation.get(deviceId);
+                }
               }
             }
-          }
-          for (let graphName in graphs) {
-            let graph = graphs[graphName];
-            graph.chart.options.scales.xAxes[0].time.unit = unit;
-            graph.chart.options.scales.xAxes[0].time.stepSize = period_s / Graph.getSeconds(unit);
-            graph.chart.update();
-            $(`#${graph.getCardId()} .overlay`).hide();
-          }
+            for (let graphName in graphs) {
+              let graph = graphs[graphName];
+              graph.chart.options.scales.xAxes[0].time.unit = unit;
+              graph.chart.options.scales.xAxes[0].time.stepSize = period_s / Graph.getSeconds(unit);
+              graph.chart.update();
+              $(`#${graph.getCardId()} .overlay`).hide();
+            }
+          });
         });
+
       } // Json handler
     );
   }

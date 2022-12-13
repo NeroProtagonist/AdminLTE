@@ -177,10 +177,12 @@
     for (let dev of devs) {
       const descReq = $.getJSON(`api_db.php?getDeviceDesc&deviceId=${dev.id}`);
       const typeReq = $.getJSON(`api_db.php?getSensorDeviceTypes&deviceId=${dev.id}`);
-      $.when(descReq, typeReq).done(
-        function(descData, typesData) {
+      const locReq = $.getJSON(`api_db.php?getLocation&deviceId=${dev.id}`);
+      $.when(descReq, typeReq, locReq).done(
+        function(descData, typesData, locData) {
           const desc = descData[0];
           const types = typesData[0];
+          const loc = locData[0][0]['location'];
           if (types.length == 0) {
             return;
           }
@@ -188,7 +190,7 @@
           let txt = `
             <div class="row">
               <div class="col-sm">
-                <h5 class="mb-2">${desc['friendlyName']}</h5>
+                <h5 class="mb-2">${desc['friendlyName']} ${loc}</h5>
               </div>
               <div class="col-sm">
                 <div class="float-sm-right">

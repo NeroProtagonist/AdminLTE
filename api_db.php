@@ -78,6 +78,33 @@ if (isset($_GET['getSensorDeviceTypes'])) {
     return;
 }
 
+if (isset($_GET['getLocation'])) {
+    if (!isset($_GET['deviceId'])) {
+        die('deviceId not set');
+    }
+
+    $deviceId = $_GET['deviceId'];
+    if (isset($_GET['endTS'])) {
+        $endTime = new DateTime("@{$_GET['endTS']}");
+        $sql = "SELECT deviceId,location,startTS FROM locations WHERE deviceId = {$deviceId} AND startTS < {$endTime->format('U')} ORDER BY startTS DESC";
+    } else {
+        $sql = "SELECT deviceId,location FROM locations WHERE deviceId = {$deviceId} ORDER BY startTS DESC LIMIT 1";
+    }
+
+    $logConnection->select_db("sensorLogs");
+
+    $res = $logConnection->query($sql);
+    $data = array();
+    while ($row = $res->fetch_assoc()) {
+        $data[] = $row;
+    }
+    $res->free_result();
+
+    header('Content-type: application/json');
+    echo json_encode($data);
+    return;
+}
+
 if (isset($_GET['getLastValues']) && isset($_GET['sensor'])) {
     if (!isset($_GET['deviceId'])) {
         die('deviceId not set');
