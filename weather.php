@@ -69,6 +69,7 @@
               };
 
   graphs['relHumidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
+  graphs['absHumidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
   graphs['pressure'].options.scales.yAxes[0].ticks.beginAtZero = false;
 
   $(document).ready(function () {
