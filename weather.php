@@ -42,7 +42,8 @@
 
     <?php
       newChart("temp", "Temperature");
-      newChart("humidity", "Humidity");
+      newChart("relHumidity", "Relative Humidity");
+      newChart("absHumidity", "Absolute Humidity");
       newChart("pressure", "Pressure");
     ?>
 
@@ -62,11 +63,12 @@
   import * as Graph from './graph.js';
 
   var graphs = { "temp": new Graph.Graph('line', 'temp', ['']),
-                 "humidity": new Graph.Graph('line', 'humidity', ['']),
+                 "relHumidity": new Graph.Graph('line', 'relHumidity', ['']),
+                 "absHumidity": new Graph.Graph('line', 'absHumidity', ['']),
                  "pressure": new Graph.Graph('line', 'pressure', [''])
               };
 
-  graphs['humidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
+  graphs['relHumidity'].options.scales.yAxes[0].ticks.beginAtZero = false;
   graphs['pressure'].options.scales.yAxes[0].ticks.beginAtZero = false;
 
   $(document).ready(function () {
@@ -117,7 +119,7 @@
       function (data) {
         let totalNum = 0;
 
-        const typeToChart = { 0: graphs['temp'].chart, 1: graphs['humidity'].chart, 2: graphs['pressure'].chart };
+        const typeToChart = { 0: graphs['temp'].chart, 1: graphs['relHumidity'].chart, 2: graphs['pressure'].chart };
 
         let devices = new Set();
 
@@ -126,6 +128,16 @@
         }
 
         let [period_s, unit] = Graph.getRawDataPeriod(endUTC - startUTC);
+
+        function initDataset(deviceId) {
+          return {
+            label: 'Device ' + deviceId,
+            backgroundColor: Object.keys(window.chartColors)[deviceId - 1],
+            borderColor: Object.keys(window.chartColors)[deviceId - 1],
+            fill: false,
+            data: []
+          };
+        }
 
         $.each(data,
           function(deviceId, rec0) {
@@ -136,6 +148,8 @@
             }
 
             devices.add(deviceId);
+
+            let absHumidityData = new Map();
 
             $.each(rec0,
               function(type, rec1) {
@@ -152,25 +166,61 @@
                 }
                 let deviceIndex = chart.indexToDevice.indexOf(deviceId);
 
-                chart.data.datasets[deviceIndex] =
-                {
-                  label: 'Device ' + deviceId,
-                  backgroundColor: Object.keys(window.chartColors)[deviceId - 1],
-                  borderColor: Object.keys(window.chartColors)[deviceId - 1],
-                  fill: false,
-                  data: []
-                };
+                chart.data.datasets[deviceIndex] = initDataset(deviceId);
 
                 $.each(rec1,
                   function(timestamp_s, val) {
                     ++totalNum;
                     chart.data.datasets[deviceIndex].data.push({ x: new Date(Number(timestamp_s * 1000)), y: val});
+                    if (!absHumidityData.has(timestamp_s)) {
+                      absHumidityData.set(timestamp_s, { temp: null, humidity: null });
+                    }
+                    if (type === 0) {
+                      absHumidityData.get(timestamp_s).temp = val;
+                    } else if (type === 1) {
+                      absHumidityData.get(timestamp_s).humidity = val;
+                    }
                   }
-                ); // $.each rec1
+                ); // $.each rec1 (timestamp + val)
               }
-            ); // $.each rec0
+            ); // $.each rec0 (type)
+
+            let ahChart = graphs['absHumidity'].chart;
+            if (!ahChart.indexToDevice.includes(deviceId)) {
+              ahChart.indexToDevice.push(deviceId);
+            }
+            const deviceIndex = ahChart.indexToDevice.indexOf(deviceId);
+            ahChart.data.datasets[deviceIndex] = initDataset(deviceId);
+
+            function degToKelvin(deg) {
+              return deg + 273.15;
+            }
+
+            function getAbsHumidity(temp, relativeHumidity) {
+              const T = degToKelvin(temp);
+              const a1 = -7.85951783;
+              const a2 = 1.84408259;
+              const a3 = -11.7866497;
+              const a4 = 22.6807411;
+              const a5 = -15.9618719;
+              const a6 = 1.80122502;
+              const Tc = 647.096; // Kelvin
+              const Pc = 22.064e6; // Pa
+              const t = 1 - (T / Tc);
+              const Ps = Pc * Math.exp((Tc / T) * (a1 * t + a2 * Math.pow(t, 1.5) + a3 * Math.pow(t, 3) + a4 * Math.pow(t, 3.5) + a5 * Math.pow(t, 4) + a6 * Math.pow(t, 7.5)));
+              const Pa = Ps * (relativeHumidity / 100);
+              const Rw = 461.5;
+              const hA = Pa / (Rw * T);
+              return hA * 1000; // to g/m^3
+            }
+
+            for (let [ts, data] of absHumidityData) {
+              if (data.temp != null && data.humidity != null) {
+                ahChart.data.datasets[deviceIndex].data.push({ x: new Date(ts * 1000), y: getAbsHumidity(Number(data.temp), Number(data.humidity))});
+              }
+            }
           }
-        ); // $.each data
+        ); // $.each data (deviceId)
 
         console.log("Got " + totalNum + " records");
 
