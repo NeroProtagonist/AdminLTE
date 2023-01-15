@@ -61,6 +61,7 @@
   "use strict";
 
   import * as Graph from './graph.js';
+  import tinycolor from "https://esm.sh/tinycolor2";
 
   var graphs = { "temp": new Graph.Graph('line', 'temp', ['']),
                  "relHumidity": new Graph.Graph('line', 'relHumidity', ['']),
@@ -124,25 +125,38 @@
 
         let devices = new Set();
 
-        for (let graphName in graphs) {
-          graphs[graphName].chart.indexToDevice = [];
-        }
-
         let [period_s, unit] = Graph.getRawDataPeriod(endUTC - startUTC);
-
-        function initDataset(deviceId) {
+        function initDataset(deviceId, type) {
           return {
             label: 'Device ' + deviceId,
-            backgroundColor: Object.keys(window.chartColors)[deviceId - 1],
-            borderColor: Object.keys(window.chartColors)[deviceId - 1],
+            backgroundColor: window.chartColors[Object.keys(window.chartColors)[deviceId - 1]],
+            borderColor: window.chartColors[Object.keys(window.chartColors)[deviceId - 1]],
             fill: false,
-            data: []
+            data: [],
+            deviceId: deviceId,
+            dataType: type
           };
+        }
+
+        function getOrCreate(chart, deviceId, type)
+        {
+          // Look for existing dataset
+          let dataset = null;
+          for (let ds of chart.data.datasets) {
+            if (ds.deviceId === deviceId && ds.dataType === type) {
+              dataset = ds;
+              break;
+            }
+          }
+          if (dataset === null) {
+            chart.data.datasets.push(initDataset(deviceId, type));
+            dataset = chart.data.datasets[chart.data.datasets.length-1];
+          }
+          return dataset;
         }
 
         $.each(data,
           function(deviceId, rec0) {
-
             if (deviceId === 'debug') {
               console.log(rec0);
               return;
@@ -162,17 +176,12 @@
 
                 let chart = typeToChart[type];
 
-                if (!chart.indexToDevice.includes(deviceId)) {
-                  chart.indexToDevice.push(deviceId);
-                }
-                let deviceIndex = chart.indexToDevice.indexOf(deviceId);
-
-                chart.data.datasets[deviceIndex] = initDataset(deviceId);
+                let dataset = getOrCreate(chart, deviceId, type);
 
                 $.each(rec1,
                   function(timestamp_s, val) {
                     ++totalNum;
-                    chart.data.datasets[deviceIndex].data.push({ x: new Date(Number(timestamp_s * 1000)), y: val});
+                    dataset.data.push({ x: new Date(Number(timestamp_s * 1000)), y: val});
                     if (!absHumidityData.has(timestamp_s)) {
                       absHumidityData.set(timestamp_s, { temp: null, humidity: null });
                     }
@@ -186,15 +195,21 @@
               }
             ); // $.each rec0 (type)
 
-            let ahChart = graphs['absHumidity'].chart;
-            if (!ahChart.indexToDevice.includes(deviceId)) {
-              ahChart.indexToDevice.push(deviceId);
+            let ahDataset = getOrCreate(graphs['absHumidity'].chart, deviceId, 7)
+            let dueDataset = getOrCreate(graphs['temp'].chart, deviceId, 6);
+            dueDataset.pointStyle = 'dash';
+
+            function lightenColour(colour) {
+              return tinycolor(colour).lighten().toString('rgb')
             }
-            const deviceIndex = ahChart.indexToDevice.indexOf(deviceId);
-            ahChart.data.datasets[deviceIndex] = initDataset(deviceId);
+            dueDataset.borderColor = lightenColour(dueDataset.borderColor);
+            dueDataset.backgroundColor = lightenColour(dueDataset.backgroundColor);
 
             function degToKelvin(deg) {
               return deg + 273.15;
+            }
+            function kelvinToDeg(kelvin) {
+              return kelvin - 273.15;
             }
 
             function getAbsHumidity(temp, relativeHumidity) {
@@ -215,15 +230,23 @@
               return hA * 1000; // to g/m^3
             }
 
+            function getDuePoint(temp, relativeHumidity) {
+              const T = temp;
+              const a = 17.625;
+              const b = 243.04;
+              const alpha = Math.log(relativeHumidity / 100) + a * T / (b + T)
+              const Ts = (b * alpha) / (a - alpha);
+              return Ts;
+            }
+
             for (let [ts, data] of absHumidityData) {
               if (data.temp != null && data.humidity != null) {
-                ahChart.data.datasets[deviceIndex].data.push({ x: new Date(ts * 1000), y: getAbsHumidity(Number(data.temp), Number(data.humidity))});
+                ahDataset.data.push({ x: new Date(ts * 1000), y: getAbsHumidity(Number(data.temp), Number(data.humidity))});
+                dueDataset.data.push( { x: new Date(ts * 1000), y: getDuePoint(Number(data.temp), Number(data.humidity))});
               }
             }
           }
         ); // $.each data (deviceId)
-
-        console.log("Got " + totalNum + " records");
 
         let deviceRequests = [];
 
@@ -247,14 +270,22 @@
 
           $.when.apply($, deviceRequests).done(function() {
             let responses = deviceRequests.length === 1 ? [arguments] : arguments;
+            // Create labels
             for (let resultIndex in responses) {
               let deviceData = responses[resultIndex][0];
               for (let graphName in graphs) {
                 let graph = graphs[graphName];
-                let deviceId = deviceData['deviceId'];
-                let deviceIndex = graph.chart.indexToDevice.indexOf(deviceId);
-                if (graph.chart.data.datasets[deviceIndex] !== undefined) {
-                  graph.chart.data.datasets[deviceIndex].label = deviceData['friendlyName'] + ' ' + deviceToLocation.get(deviceId);
+                const deviceId = deviceData['deviceId'];
+                for (let ds of graph.chart.data.datasets) {
+                  let typeDesc = '';
+                  if (ds.dataType === 0) {
+                    typeDesc = ' Temperature';
+                  } else if (ds.dataType === 6) {
+                    typeDesc = ' Dew Point';
+                  }
+                  if (ds.deviceId === deviceId) {
+                    ds.label = deviceData['friendlyName'] + typeDesc + ' - ' + deviceToLocation.get(deviceId);
+                  }
                 }
               }
             }
