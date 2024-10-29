@@ -123,9 +123,14 @@
 
         const typeToChart = { 0: graphs['temp'].chart, 1: graphs['relHumidity'].chart, 2: graphs['pressure'].chart };
 
+        for (let graphName in graphs) {
+          graphs[graphName].chart.data.datasets = [];
+        }
+
         let devices = new Set();
 
         let [period_s, unit] = Graph.getRawDataPeriod(endUTC - startUTC);
+
         function initDataset(deviceId, type) {
           return {
             label: 'Device ' + deviceId,
@@ -138,21 +143,10 @@
           };
         }
 
-        function getOrCreate(chart, deviceId, type)
+        function createDataset(chart, deviceId, type)
         {
-          // Look for existing dataset
-          let dataset = null;
-          for (let ds of chart.data.datasets) {
-            if (ds.deviceId === deviceId && ds.dataType === type) {
-              dataset = ds;
-              break;
-            }
-          }
-          if (dataset === null) {
-            chart.data.datasets.push(initDataset(deviceId, type));
-            dataset = chart.data.datasets[chart.data.datasets.length-1];
-          }
-          return dataset;
+          chart.data.datasets.push(initDataset(deviceId, type));
+          return chart.data.datasets[chart.data.datasets.length-1];
         }
 
         $.each(data,
@@ -176,7 +170,7 @@
 
                 let chart = typeToChart[type];
 
-                let dataset = getOrCreate(chart, deviceId, type);
+                let dataset = createDataset(chart, deviceId, type);
 
                 $.each(rec1,
                   function(timestamp_s, val) {
@@ -195,8 +189,8 @@
               }
             ); // $.each rec0 (type)
 
-            let ahDataset = getOrCreate(graphs['absHumidity'].chart, deviceId, 7)
-            let dueDataset = getOrCreate(graphs['temp'].chart, deviceId, 6);
+            let ahDataset = createDataset(graphs['absHumidity'].chart, deviceId, 7)
+            let dueDataset = createDataset(graphs['temp'].chart, deviceId, 6);
             dueDataset.pointStyle = 'dash';
 
             function lightenColour(colour) {

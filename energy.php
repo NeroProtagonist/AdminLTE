@@ -24,7 +24,9 @@
           </div> <!-- .card-header -->
           <div class="card-body">
             <select id="meterPeriod", class="form-control">
-              <option value="meter_15m">15 minutes</option>
+              <option value="meter_1m">1 minute</option>
+              <option value="meter_5m">5 minutes</option>
+              <option value="meter_15m" selected>15 minutes</option>
               <option value='meter_1h''>Hourly</option>
               <option value='meter_24h'>Daily</option>
             </select>
@@ -36,6 +38,9 @@
     <?php
       newChart("meter-elec-received", "Elec Received");
       newChart("meter-power-received", "Power Received");
+      newChart("meter-phase-power", "Phase Power");
+      newChart("meter-phase-voltage", "Phase Voltage");
+      newChart("meter-phase-current", "Phase Current");
       newChart("meter-gas-received", "Gas Received");
     ?>
   </div> <!-- .container-fluid -->
@@ -100,6 +105,9 @@
                             ]);
   let meterGraphs = new Map([ ['elecReceived', new Graph('bar', 'meter-elec-received', [ 'Energy from supplier (kWh)', 'Energy to supplier (kWh)' ])],
                               ['powerReceived', new Graph('line', 'meter-power-received', [ 'Power from supplier (kW)', 'Power to supplier (kW)' ])],
+                              ['phasePower', new Graph('line', 'meter-phase-power', [ 'L1', 'L2', 'L3' ] )],
+                              ['phaseVoltage', new Graph('line', 'meter-phase-voltage', [ 'L1', 'L2', 'L3'] )],
+                              ['phaseCurrent', new Graph('line', 'meter-phase-current', [ 'L1', 'L2', 'L3'] )],
                               ['gasReceived', new Graph('bar', 'meter-gas-received', [ 'Gas from supplier (m^3)' ])]
                             ]);
 
@@ -119,6 +127,8 @@
   function getPeriod(str) {
     let [period_s, unit, startDate] = function() {
       switch (str) {
+        case 'meter_1m': return [ 60, 'minute', moment().subtract(30, 'minutes').startOf('minute') ]
+        case 'meter_5m': return [ 5 * 60, 'minute', moment().subtract(2, 'hours').startOf('hour') ];
         case 'meter_15m': return [ 15 * 60, 'minute', moment().subtract(6, 'hours').startOf('hour') ];
         case 'meter_1h': return [ 60 * 60, 'hour', moment().startOf('day') ];
         case 'meter_24h': return [ 24 * 60 * 60, 'day', moment().startOf('month') ];
@@ -221,6 +231,15 @@
                               7: { chart: meterGraphs.get('elecReceived').chart, dataset: 1 },
                               9: { chart: meterGraphs.get('powerReceived').chart, dataset: 0 },
                               10: { chart: meterGraphs.get('powerReceived').chart, dataset: 1 },
+                              20: { chart: meterGraphs.get('phaseVoltage').chart, dataset: 0 },
+                              21: { chart: meterGraphs.get('phaseVoltage').chart, dataset: 1 },
+                              22: { chart: meterGraphs.get('phaseVoltage').chart, dataset: 2 },
+                              23: { chart: meterGraphs.get('phaseCurrent').chart, dataset: 0 },
+                              24: { chart: meterGraphs.get('phaseCurrent').chart, dataset: 1 },
+                              25: { chart: meterGraphs.get('phaseCurrent').chart, dataset: 2 },
+                              26: { chart: meterGraphs.get('phasePower').chart, dataset: 0 },
+                              27: { chart: meterGraphs.get('phasePower').chart, dataset: 1 },
+                              28: { chart: meterGraphs.get('phasePower').chart, dataset: 2 },
                               33: { chart: meterGraphs.get('gasReceived').chart, dataset: 0 },
                             };
 
@@ -266,6 +285,15 @@
               }
               case 9:
               case 10:
+              case 20:
+              case 21:
+              case 22:
+              case 23:
+              case 24:
+              case 25:
+              case 26:
+              case 27:
+              case 28:
               {
                 if (deltaT > period_s * 0.95) {
                   // TODO: Could choose max of this and current

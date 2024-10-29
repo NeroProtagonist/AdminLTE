@@ -94,10 +94,10 @@
   }
 
   let allDevs = [];
-  const energyStatsLayout = [ [ 9, 10 ] ];
+  const energyStatsLayout = [ [ 9, 10 ], [ 20, 21, 22 ], [ 23, 24, 25 ], [ 26, 27, 28 ] ];
   const statDescOverride = new Map( [ [9, "Power Received"],
                                   [10, "Power Sent" ] ]);
-  const energyStatsRowDesc = [ 'Power' ];
+  const energyStatsRowDesc = [ 'Power', 'Phase Voltage', 'Phase Current', 'Phase Power' ];
 
   let aqiDevices = [];
   function getAQIElements(device) {
@@ -122,7 +122,6 @@
         $(`#${sampleId}`).removeClass();
         $(`#${sampleId}`).addClass(`mb-2 ${sampleColour}`);
         $(`#${sampleId}`).html(sampleTime.format('ddd DD/MM/YY HH:mm:ss'));
-
 
         let pm25AQI = null, pm10AQI = null;
         for (let value of values) {
@@ -293,7 +292,7 @@
     /**********************/
     $('#meterInsert').empty();
 
-    $.getJSON("api_db.php?getLastValues&meter&stats=9,10",
+    $.getJSON("api_db.php?getLastValues&meter&stats=9,10,20,21,22,23,24,25,26,27,28",
       function(stats) {
         let row = 0;
         for (let statRow in energyStatsLayout) {
@@ -313,11 +312,11 @@
           for (let stat of energyStatsLayout[statRow]) {
             let displaySet = getMeterDisplaySet(stats[stat]);
             txt += `
-              <div class="col-md-6">
+              <div class="col-md">
                 <div class="small-box bg-primary">
                   <div class="inner">
                     <h3 id="${displaySet.id}">${displaySet.text}</h3>
-                    <p>${statDescOverride.get(stat)}</p>
+                    <p>${statDescOverride.has(stats) ? statDescOverride.get(stat) : stats[stat]['stat']}</p>
                   </div>
                   <div class="icon">
                     <i class="fas fa-bolt"></i>
