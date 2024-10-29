@@ -147,11 +147,12 @@ if (isset($_GET['getLastValues']) && isset($_GET['sensor'])) {
                         AND type = {$type}
                         {$ignore}
                         AND ts >= (
-                                    SELECT MAX(ts)
+                                    SELECT ts - 120
                                     FROM log
                                     WHERE deviceId = {$deviceId}
                                         AND type = {$type}
-                                    ) - 120";
+                                    ORDER BY ts DESC LIMIT 1
+                                    )";
         }
         $res2 = $logConnection->query($sql);
         while ($row2 = $res2->fetch_assoc()) {
@@ -340,9 +341,8 @@ if (isset($_GET['getGraphData3']) && isset($_GET['sensor'])) {
 
     list($fromTime, $toTime) = getQueryTimespan();
     $delta_s = abs($fromTime->getTimestamp() - $toTime->getTimestamp());
-    $interval_s = $delta_s / 200;
-    $interval_s = max((int)((int)($interval_s) / 5) * 5, 2);
-    $sql .= " GROUP BY ts DIV ($delta_s / 200), deviceId, type";
+    $numSamples = 50;
+    $sql .= " GROUP BY ts DIV ($delta_s / $numSamples), deviceId, type";
 
     if (isset($_GET['movingAverage'])) {
         $offset = $_GET['movingAverage'];
